@@ -36,7 +36,7 @@ model_path = os.path.join(models_dir_path, model_name)
 
 # Create STM32AI Class with Cloud Backend, given a username/password and a possible version
 # Version set to "None" will use the latest version available in Developer Cloud
-ai = Stm32Ai(CloudBackend(username, password, version='3.0.0'))
+ai = Stm32Ai(CloudBackend(username, password, version='4.0.0'))
 # List boards available for a benchmark in STM32Cube.AI Developer Cloud
 boards = ai.get_benchmark_boards()
 print(boards)

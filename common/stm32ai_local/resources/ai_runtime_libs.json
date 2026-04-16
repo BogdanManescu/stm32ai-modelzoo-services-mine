@@ -38,6 +38,11 @@
                 "lib_dir":  "Middlewares/ST/AI/Lib/GCC/ARMCortexM33/",
                 "core_flags": "-mthumb -mcpu=cortex-m33 -mfpu=fpv5-sp-d16 -mtune=cortex-m33 -mfloat-abi=hard"
             },
+                        {
+                "series" : ["stm32u3"],
+                "lib_dir":  "Middlewares/ST/AI/Lib/GCC/ARMCortexM33/",
+                "core_flags": "-mthumb -mcpu=cortex-m33 -mfpu=fpv5-sp-d16 -mtune=cortex-m33 -mfloat-abi=hard"
+            },
             {
                 "series" : ["stm32n6"],
                 "lib_dir":  "Middlewares/ST/AI/Lib/GCC/ARMCortexM55/",

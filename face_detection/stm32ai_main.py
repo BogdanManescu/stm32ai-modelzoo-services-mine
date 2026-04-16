@@ -17,8 +17,9 @@ os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 import argparse
 from omegaconf import DictConfig
 from hydra.core.hydra_config import HydraConfig
-import mlflow
 import tensorflow as tf
+import mlflow
+
 from clearml import Task
 from clearml.backend_config.defs import get_active_config_file
 

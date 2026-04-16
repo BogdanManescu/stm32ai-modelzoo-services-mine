@@ -18,12 +18,12 @@ from omegaconf import DictConfig
 from tqdm import tqdm
 from tabulate import tabulate
 import math
-import mlflow
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from onnx import ModelProto
 import onnxruntime
+import mlflow
 
 from face_detection.tf.src.postprocessing import get_nmsed_detections, get_detections
 from face_detection.tf.src.preprocessing import get_evaluation_data_loader

@@ -1,6 +1,6 @@
 # How to deploy a model on a B-U585I-IOT02A board ?
 
-This tutorial explains how to deploy a model from the ST public model zoo directly on your STM32 target board. In this version deployment on the B-U585I-IOT02A and [STM32N6750-DK](https://www.st.com/en/evaluation-tools/stm32n6570-dk.html) is supported.
+This tutorial explains how to deploy a model from the ST public model zoo directly on your STM32 target board. In this version deployment on the [B-U585I-IOT02A](https://www.st.com/en/evaluation-tools/b-u585i-iot02a.html), [STM32N6570-DK](https://www.st.com/en/evaluation-tools/stm32n6570-dk.html) and [NUCLEO-U3C5ZI-Q](https://www.st.com/en/evaluation-tools/nucleo-u3c5zi-q.html) are supported. 
 
 For a more detailed tutorial, look at this [tutorial](https://github.com/STMicroelectronics/stm32ai-modelzoo-services/tree/main/audio_event_detection/deployment)
 

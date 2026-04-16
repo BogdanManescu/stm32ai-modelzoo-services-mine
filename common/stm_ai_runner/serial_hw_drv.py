@@ -41,6 +41,9 @@ def serial_device_discovery() -> List:
         # workaround to detect a non USB virtual COM port
         if 'PCI' in com.hwid and 'usb' not in com.hwid.lower():
             continue
+        # skip Bluetooth virtual COM ports (BTHENUM); they can block / misbehave with stm_ai_runner
+        if 'BTHENUM' in com.hwid:
+            continue
         elem = {
             'type': 'serial',
             'device': com.device,
@@ -139,7 +142,7 @@ class SerialHwDriver(AiHwDriver):
                     hdl.open()
                 else:
                     hdl = Serial(device, baudrate=baudrate, timeout=timeout,
-                                 exclusive=True)
+                                 exclusive=True, write_timeout=5)
             except SerialException as _e:
                 n_retry -= 1
                 if not n_retry:

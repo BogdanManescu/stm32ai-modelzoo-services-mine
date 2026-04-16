@@ -10,7 +10,6 @@
 import os
 from pathlib import Path
 import warnings
-import mlflow
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
 import numpy as np
@@ -18,6 +17,7 @@ import numpy as np
 warnings.filterwarnings("ignore")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
+import mlflow
 from typing import Optional
 
 from common.utils import compute_confusion_matrix, count_h5_parameters, plot_confusion_matrix, log_to_file

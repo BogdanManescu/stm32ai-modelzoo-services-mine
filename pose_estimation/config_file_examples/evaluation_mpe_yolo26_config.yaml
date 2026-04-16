@@ -1,0 +1,34 @@
+model: 
+   model_path: https://github.com/stm32-hotspot/ultralytics/raw/refs/heads/main/examples/YOLOv8-STEdgeAI/stedgeai_models/pose_estimation/yolo26/yolo26_pose_256_qdq_int8.onnx
+   model_type: yolo_mpe
+
+
+operation_mode: evaluation
+
+dataset:
+   dataset_name: coco
+   keypoints: 17
+   test_path: ./datasets/COCO_val_dataset_multi_pose
+
+preprocessing:
+   rescaling:
+      scale: 1/255
+      offset: 0
+   resizing:
+      interpolation: bilinear
+      aspect_ratio: fit
+   color_mode: rgb
+
+postprocessing:
+   kpts_conf_thresh: 0.15
+   confidence_thresh: 0.001
+   NMS_thresh: 0.1
+   plot_metrics: false
+   max_detection_boxes: 100
+
+mlflow:
+   uri: ./tf/src/rc/experiments_outputs/mlruns
+
+hydra:
+   run:
+      dir: ./tf/src/rc/experiments_outputs/${now:%Y_%m_%d_%H_%M_%S}

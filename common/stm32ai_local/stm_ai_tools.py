@@ -254,6 +254,23 @@ class STMAiTools:
 
         return ''
 
+    def stedgeai_lib(self) -> str:
+        """Return path of the stedgeai-lib path"""
+
+        extra = Path('Middlewares/ST/AI')
+        candidate = Path(self._root_path) / extra
+        if candidate.is_dir():
+            return candidate
+        # _root_path may be off by one version subfolder depending on the
+        # installation layout (e.g. /opt/ST/STEdgeAI vs /opt/ST/STEdgeAI/x.y).
+        # Walk up from the actual executable to find Middlewares/ST/AI.
+        if self._executable:
+            for parent in Path(self._executable).parents:
+                candidate = parent / extra
+                if candidate.is_dir():
+                    return candidate
+        return Path(self._root_path) / extra
+
     def ai_runtime_inc(self) -> str:
         """Return path of the C-header files of the AI network runtime lib"""
 

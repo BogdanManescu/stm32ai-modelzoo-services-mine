@@ -13,12 +13,12 @@ from timeit import default_timer as timer
 from datetime import timedelta
 from typing import Tuple, List, Dict, Optional
 
-import mlflow
 from hydra.core.hydra_config import HydraConfig
 from munch import DefaultMunch
 from omegaconf import DictConfig
 import numpy as np
 import tensorflow as tf
+import mlflow
 
 # Suppress Tensorflow warnings
 import logging

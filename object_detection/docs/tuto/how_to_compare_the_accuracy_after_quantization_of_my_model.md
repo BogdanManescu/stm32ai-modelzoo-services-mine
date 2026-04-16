@@ -44,7 +44,8 @@ dataset:
    format: tfs
    dataset_name: coco
    class_names: [<your-classes-used-during-training>]
-   test_path: <test-set-root-directory>  
+   test_images_path: <test-set-root-directory>  
+   test_annotations_path: <test-set-root-directory>  
    # Needed if quantization in operation mode
    quantization_path: <quantization-set-root-directory> # you can use your training dataset
    

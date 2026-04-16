@@ -15,13 +15,14 @@ import shlex
 import subprocess
 import functools
 from subprocess import Popen
+import requests
 from typing import List, Union, Optional, Tuple, Dict
 import mlflow
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
 from common.stm32ai_dc import (CliLibraryIde, CliLibrarySerie, CliParameters, MpuParameters, MpuEngine,
                         CloudBackend, Stm32Ai)
-from common.stm32ai_dc.errors import BenchmarkServerError
+from common.stm32ai_dc.errors import BenchmarkServerError, InvalidCrendetialsException, BlockedAccountException, LoginFailureException
 from common.stm32ai_dc.types import AtonParameters
 from common.utils import log_to_file, get_model_name_and_its_input_shape, get_model_name
 
@@ -49,6 +50,7 @@ def benchmark(cfg: DictConfig = None, model_path_to_benchmark: Optional[str] = N
     optimization = cfg.tools.stedgeai.optimization
     board = cfg.benchmarking.board
     path_to_stm32ai = cfg.tools.stedgeai.path_to_stm32ai
+    hsp = cfg.tools.stedgeai.hsp
     #log the parameters in stm32ai_main.log
     log_to_file(cfg.output_dir, f'stedgeai core version : {stedgeai_core_version}')
     log_to_file(cfg.output_dir, f'Benchmarking board : {board}')
@@ -60,7 +62,8 @@ def benchmark(cfg: DictConfig = None, model_path_to_benchmark: Optional[str] = N
                       stedgeai_core_version=stedgeai_core_version, model_path=model_path,
                       stm32ai_output=stm32ai_output, path_to_stm32ai=path_to_stm32ai,
                       get_model_name_output=get_model_name_output,on_cloud =cfg.tools.stedgeai.on_cloud,
-                      credentials=credentials)
+                      credentials=credentials,
+                      hsp=hsp)
     print('[INFO] : Benchmark complete.')
 
 
@@ -222,19 +225,23 @@ def _analyze_footprints(offline: bool = True, results: dict = None, stm32ai_outp
                 log_file.write(f'Inference_time : {inference_time} ms\n' + f'NPU usage : {npu_percent} %\n' + f'GPU usage : {gpu_percent} %\n' + f'CPU usage : {cpu_percent} %\n')
 
 
-def benchmark_model(optimization: str = None, model_path: str = None, path_to_stm32ai: str = None,
-                    stm32ai_output: str = None, stedgeai_core_version: str = None, get_model_name_output: str = None) -> \
+def benchmark_model(board_name: str = None, 
+                    optimization: str = None, model_path: str = None, path_to_stm32ai: str = None,
+                    stm32ai_output: str = None, stedgeai_core_version: str = None, get_model_name_output: str = None,
+                    hsp: int = 0) -> \
         Optional[Exception]:
     """
     Benchmark model using STM32Cube.AI locally.
 
     Args:
+        board_name(str): Name of the board to benchmark the model on
         optimization (str): Optimization level.
         model_path (str): Path to the model file.
         path_to_stm32ai (str): Path to STM32Cube.AI.
         stm32ai_output (str): Path to output directory.
         stedgeai_core_version (str): STEdgeAI Core version.
         get_model_name_output (str): Model name output.
+        hsp (int): Amount of memory allocated to the HSP acceleration
 
     Returns:
         Optional[Exception]: None if successful, otherwise the exception that occurred.
@@ -261,8 +268,13 @@ def benchmark_model(optimization: str = None, model_path: str = None, path_to_st
         print(f"[INFO] : STEdgeAI Core version {version_line} used.")
 
         # Run generate command locally
-        command = f"{path_to_stm32ai} generate --target stm32 -m {model_path} -v 0 --output {stm32ai_output} --workspace {stm32ai_output} --optimization {optimization}"
-        # command = f"{path_to_stm32ai} generate --target stm32n6 -m {model_path} --st-neural-art user_neuralart.json"
+        if "STM32N6" in board_name:
+            command = f"{path_to_stm32ai} generate --target stm32n6 -m {model_path} -v 0 --output {stm32ai_output} --workspace {stm32ai_output} --optimization {optimization}"
+            # command = f"{path_to_stm32ai} generate --target stm32n6 -m {model_path} --st-neural-art user_neuralart.json"
+        elif "U3C5" in board_name:
+            command = f"{path_to_stm32ai} generate --target stm32u3 -m {model_path} --hsp {hsp} -v 0 --output {stm32ai_output} --workspace {stm32ai_output} --optimization {optimization}"
+        else:
+            command = f"{path_to_stm32ai} generate --target stm32 -m {model_path} -v 0 --output {stm32ai_output} --workspace {stm32ai_output} --optimization {optimization}"
         args = shlex.split(command, posix="win" not in sys.platform)
         subprocess.run(args, env=new_env, check=True)
 
@@ -322,20 +334,33 @@ def cloud_connect(stedgeai_core_version: str = None, credentials: list[str] = No
 
     login_success = False
     ai = None
-    # Try to create the STM32Cube.AI instance up to 3 times
+    # Try to create the STM32Cube.AI instance up to 3 times.
+    # Re-prompt for credentials only on actual credential errors (InvalidCrendetialsException).
+    # Network/other failures (LoginFailureException) are not retried here because
+    # LoginService.login() already performs 3 low-level network retries internally.
     for attempt in range(3):
         try:
             backend = CloudBackend(username, password, version=stedgeai_core_version)
             ai = Stm32Ai(backend)
             login_success = True
             break
+        except requests.exceptions.SSLError as e:
+            print(f"[WARN] : SSL certificate verification failed: {e}")
+            print("[WARN] : Retrying with SSL verification disabled...")
+            os.environ['NO_SSL_VERIFY'] = '1'
+        except (InvalidCrendetialsException, BlockedAccountException) as e:
+            print(f"[ERROR] : {e}")
+            if isinstance(e, BlockedAccountException) or attempt >= 2:
+                break
+            print("[ERROR]: Login failed. Please try again.")
+            username, password = _get_credentials()
+        except LoginFailureException as e:
+            # Network or other non-credential failure — no point re-prompting.
+            print(f"[ERROR] : {e}")
+            break
         except Exception as e:
-            if type(e).__name__ == "LoginFailureException":
-                if attempt < 2:
-                    print("[ERROR]: Login failed. Please try again.")
-                    username, password = _get_credentials()
-                else:
-                    print("[ERROR]: Failed to create STM32Cube.AI instance.")
+            print(f"[ERROR] : {e}")
+            break
 
     if login_success:
         print("[INFO] : Successfully connected!")
@@ -413,7 +438,7 @@ def _get_mpu_options(board_name: str = None) -> tuple:
 
 
 def _cloud_benchmark(ai: Stm32Ai = None, model_path: str = None, board_name: str = None, optimization: str = None,
-                    get_model_name_output: str = None) -> dict:
+                    get_model_name_output: str = None, hsp: int = 0) -> dict:
     """
     Use STM32Cube.AI Developer Cloud Services to benchmark the model on a board and generate C code.
 
@@ -422,6 +447,7 @@ def _cloud_benchmark(ai: Stm32Ai = None, model_path: str = None, board_name: str
     :param board_name: Name of the board to benchmark the model on
     :param optimization: Type of optimization to apply to the model
     :param get_model_name_output: Path to the output directory for the generated model name
+    :param hsp: amount of memory allocated to the HSP acceleration
     :return: Dictionary of benchmark results.
     """
     # Set up the STM32Cube.AI API client
@@ -444,6 +470,8 @@ def _cloud_benchmark(ai: Stm32Ai = None, model_path: str = None, board_name: str
     elif "STM32N6" in board_name:
 #        stmai_params = CliParameters(model=model_name, target='stm32n6', stNeuralArt='default', atonnOptions=AtonParameters())
         stmai_params = CliParameters(model=model_name, target='stm32n6', stNeuralArt='default', atonnOptions=AtonParameters(enable_epoch_controller=True))
+    elif "U3C5" in board_name:
+        stmai_params = CliParameters(model=model_name, target='stm32u3', hsp=hsp, fromModel=get_model_name_output)
     else:
         stmai_params = CliParameters(model=model_name, optimization=optimization, fromModel=get_model_name_output)
     res_benchmark = ai.benchmark(stmai_params,
@@ -459,7 +487,8 @@ def _stm32ai_benchmark(footprints_on_target: str = False, optimization: str = No
                       stedgeai_core_version: str = None, model_path: str = None,
                       stm32ai_output: str = None, path_to_stm32ai: str = None,
                       get_model_name_output: str = None, on_cloud: bool = False,
-                      credentials: list[str] = None) -> None:
+                      credentials: list[str] = None,
+                      hsp: int = 0) -> None:
     """
     Benchmarks a model on Cloud or locally.
 
@@ -470,8 +499,9 @@ def _stm32ai_benchmark(footprints_on_target: str = False, optimization: str = No
     - model_path (str): Path to the model file.
     - stm32ai_output (str): Path to the output directory for the generated C code.
     - get_model_name_output (str): Path to the output directory for the generated model name.
-    -  on_cloud(bool):Flag indicating whether to benchmark on cloud or not.
-    - credentials list[str]: User credentials used before to connect.
+    -  on_cloud (bool):Flag indicating whether to benchmark on cloud or not.
+    - credentials list (str): User credentials used before to connect.
+    - hsp (int): Value between 0 and 4096 corresponding to the BRAM allocated fir the HSP acceleration
     Returns:
     - None
     """
@@ -523,7 +553,8 @@ def _stm32ai_benchmark(footprints_on_target: str = False, optimization: str = No
                 # Benchmark the model inference time
                 cloud_res = _cloud_benchmark(ai=ai, model_path=model_path, board_name=board_name,
                                                 optimization=optimization,
-                                                get_model_name_output=get_model_name_output)
+                                                get_model_name_output=get_model_name_output,
+                                                hsp=hsp)
 
                 inference_res = True
                 offline = False
@@ -542,9 +573,10 @@ def _stm32ai_benchmark(footprints_on_target: str = False, optimization: str = No
                         print(
                             "[INFO] : Using the local download of STM32Cube.AI. Link to download https://www.st.com/en/embedded-software/x-cube-ai.html")
                         benchmark_model(
+                            board_name=board_name,
                             optimization=optimization, model_path=model_path, path_to_stm32ai=path_to_stm32ai,
                             stm32ai_output=stm32ai_output, stedgeai_core_version=stedgeai_core_version,
-                            get_model_name_output=get_model_name_output)
+                            get_model_name_output=get_model_name_output, hsp=hsp)
                     else :
                         print("[FAIL] : Cloud Analyze failed :", e)
                         exit(1)
@@ -553,9 +585,10 @@ def _stm32ai_benchmark(footprints_on_target: str = False, optimization: str = No
                 print(
                     "[INFO] : Using the local download of STM32Cube.AI. Link to download https://www.st.com/en/embedded-software/x-cube-ai.html")
                 benchmark_model(
+                    board_name=board_name,
                     optimization=optimization, model_path=model_path, path_to_stm32ai=path_to_stm32ai,
                     stm32ai_output=stm32ai_output, stedgeai_core_version=stedgeai_core_version,
-                    get_model_name_output=get_model_name_output)
+                    get_model_name_output=get_model_name_output, hsp=hsp)
             else :
                 print("[FAIL] : Login to Developer cloud failed")
                 exit(1)
@@ -563,9 +596,10 @@ def _stm32ai_benchmark(footprints_on_target: str = False, optimization: str = No
         print(
             "[INFO] : Using the local download of STM32Cube.AI. Link to download https://www.st.com/en/embedded-software/x-cube-ai.html")
         benchmark_model(
+            board_name=board_name,
             optimization=optimization, model_path=model_path, path_to_stm32ai=path_to_stm32ai,
             stm32ai_output=stm32ai_output, stedgeai_core_version=stedgeai_core_version,
-            get_model_name_output=get_model_name_output)
+            get_model_name_output=get_model_name_output, hsp=hsp)
 
     # Print footprints
     _analyze_footprints(offline=offline, results=cloud_res, stm32ai_output=stm32ai_output, inference_res=inference_res, target_mcu=target_mcu)

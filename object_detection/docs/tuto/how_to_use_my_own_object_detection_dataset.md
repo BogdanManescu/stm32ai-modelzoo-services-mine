@@ -29,8 +29,6 @@ dataset:
   download_data: false
   max_detections: 20
 
-  data_dir: ./datasets/COCO_2017_person/tmp/coco_like/
-
   train_images_path: /local/data/OD_datasets/COCO/train2017
   train_annotations_path: /local/data/OD_datasets/COCO/annotations/person_keypoints_train2017.json
 
@@ -43,14 +41,14 @@ If your dataset is in Pascal VOC format (one XML file per image), the dataset_na
 
 You must set:
 
-* `data_dir`: temporary directory where the converted TFS files will be generated
 * `train_images_path`: directory containing your training images
-* `train_xml_dir`: directory containing the training XML annotation files
+* `train_annotations_path`: directory containing the training XML annotation files
+* `train_split`: directory containing the training XML annotation files
 
 You can optionally also specify validation paths:
 
 * ``val_images_path`: directory containing your validation images
-* ``val_xml_dir`: directory containing the validation XML annotation files
+* ``val_annotations_path`: directory containing the validation XML annotation files
 
 Example:
 
@@ -63,22 +61,21 @@ dataset:
   download_data: false
   max_detections: 50
 
-  # Temporary directory for generated TFS files
-  data_dir: ./datasets/VOC_custom/tmp/tfs/
-
   # Training subset
   train_images_path: /local/data/OD_datasets/VOC_custom/JPEGImages/train
-  train_xml_dir: /local/data/OD_datasets/VOC_custom/Annotations/train
+  train_annotations_path: /local/data/OD_datasets/VOC_custom/Annotations/train
+  train_split:  /local/data/OD_datasets/VOC_custom/ImageSets/Main/train.txt
 
   # Validation subset (optional)
   val_images_path: /local/data/OD_datasets/VOC_custom/JPEGImages/val
-  val_xml_dir: /local/data/OD_datasets/VOC_custom/Annotations/val
+  val_annotations_path: /local/data/OD_datasets/VOC_custom/Annotations/val
+  train_split:  /local/data/OD_datasets/VOC_custom/ImageSets/Main/val.txt
 ````
 When you run the training (or evaluation/quantization) command with this configuration, the pipeline will:
 
 1. Read images from train_images_path (and val_images_path if provided).
 2. Read XML annotations from train_xml_dir (and val_xml_dir if provided).
-3. Generate .tfs TFRecord files under data_dir.
+3. Generate .tfs TFRecord files under a `tfs_labels` directory.
 4. Use these .tfs files for the actual training/evaluation/quantization.
 
 #### Case 3: YOLO Darknet Format dataset
@@ -86,7 +83,7 @@ If your dataset is in YOLO Darknet format (one .txt annotation file per image wi
 
 For this case, the loader expects a single root directory containing both images and their corresponding YOLO .txt files:
 
-* `data_dir`: directory containing the images and YOLO .txt annotation files
+* `train_images_path`: directory containing the images and YOLO .txt annotation files
 Within data_dir, a typical pattern is:
 ```
 image_0001.jpg
@@ -106,13 +103,18 @@ dataset:
   download_data: false
   max_detections: 50
 
-  # Root directory containing images + YOLO .txt annotations
-  data_dir: /local/data/OD_datasets/YOLO_custom/
+  # Training subset
+  train_images_path: /local/data/OD_datasets/YOLO_Darknet/train
+  train_annotations_path: /local/data/OD_datasets/YOLO_Darknet/train
+
+  # Validation subset (optional)
+  val_images_path: /local/data/OD_datasets/YOLO_Darknet/val
+  val_annotations_path: /local/data/OD_datasets/YOLO_Darknet/val
 ````
 
 With this configuration, the dataloader will:
 
-1. Parse all images and .txt annotation files found under data_dir.
+1. Parse all images and .txt annotation files found under train_images_path and train_annotations_path. They might point to the same path if the JPG/JPEG/PNG and TXT files are hosted in the same directory.
 2. Convert YOLO bounding boxes and class IDs into the internal TFS TensorFlow representation.
 3. Generate .tfs TFRecord files under a tool‑managed temporary folder (or within data_dir, depending on implementation).
 4. Use these .tfs files for training/evaluation/quantization.
@@ -136,8 +138,13 @@ dataset:
   download_data: false
   max_detections: 50
 
-  # Directory where your pre-generated .tfs TFRecords are stored
-  data_dir: /local/data/OD_datasets/custom_tfs/
+  # Training subset
+  train_images_path: /local/data/OD_datasets/TFS_format_datasets/train
+  train_annotations_path: /local/data/OD_datasets/TFS_format_datasets/train
+  # Validation subset (optional)
+  val_images_path: /local/data/OD_datasets/TFS_format_datasets/val
+  val_annotations_path: /local/data/OD_datasets/TFS_format_datasets/val
+
 ````
 
 In this configuration, no additional conversion is done. The training/evaluation/quantization scripts directly read the TFS TensorFlow records.

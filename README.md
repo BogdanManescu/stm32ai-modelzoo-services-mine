@@ -27,10 +27,19 @@ git clone https://github.com/STMicroelectronics/stm32ai-modelzoo-services.git --
 ```
 ## What's new in releases :
 
-<details open><summary><b>4.0:</b></summary>
+<details open><summary><b>4.1:</b></summary>
+
+* Support of **STEdgeAI Core v4.0.0**.
+* Updated **Audio Event Detection (AED)** to support deployment on **STM32U3**. 
+* Added support for the **YOLO26** model.
+* Multiple bug fixes and overall quality improvements.
+
+</details>
+
+<details><summary><b>4.0:</b></summary>
 
 * Major PyTorch support for Image Classification (IC) and Object Detection (OD)
-* Support of **STEdgeAI Core v3.0.0**
+* Support of **STEdgeAI Core from v3.0.0 to latest**
 * New training and evaluation scripts for PyTorch models
 * Expanded model selection and improved documentation
 * Unified workflow for TensorFlow and PyTorch
@@ -176,7 +185,7 @@ Object detection is used to detect, locate and estimate the occurrences probabil
 | Suitable Targets for Deployment | Models |
 |---------------------------------|--------|
 | STM32H747I-DISCO | [ST Yolo LC v1](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/st_yololcv1/README.md) |
-| STM32N6570-DK | [Tiny Yolo v2](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/yolov2t/README.md), [ST Yolo X](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/st_yoloxn/README.md), [Yolo v8](https://github.com/stm32-hotspot/ultralytics/tree/main/examples/YOLOv8-STEdgeAI/stedgeai_models/object_detection), [Yolo v11](https://github.com/stm32-hotspot/ultralytics/tree/main/examples/YOLOv8-STEdgeAI/stedgeai_models/object_detection), [Blazeface front](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/facedetect_front/README.md), [SSD_MobileNetV1_pt](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/ssd_mobilenetv1_pt/README.md), [SSD_MobileNetV2_pt](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/ssd_mobilenetv2_pt/README.md), [SSDLite_MobileNetV1_pt](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/ssdlite_mobilenetv1_pt/README.md), [SSDLite_MobileNetV2_pt](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/ssdlite_mobilenetv2_pt/README.md), [SSDLite_MobileNetV3Large_pt](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/ssdlite_mobilenetv3large_pt/README.md), [SSDLite_MobileNetV3Small_pt](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/ssdlite_mobilenetv3small_pt/README.md), [ST_YoloDv2Milli_pt](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/st_yolodv2milli_pt/README.md), [ST_YoloDv2Tiny_pt](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/st_yolodv2tiny_pt/README.md) |
+| STM32N6570-DK | [Tiny Yolo v2](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/yolov2t/README.md), [ST Yolo X](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/st_yoloxn/README.md), [Yolo v8](https://github.com/stm32-hotspot/ultralytics/tree/main/examples/YOLOv8-STEdgeAI/stedgeai_models/object_detection), [Yolo v11](https://github.com/stm32-hotspot/ultralytics/tree/main/examples/YOLOv8-STEdgeAI/stedgeai_models/object_detection), [Yolo 26](https://github.com/stm32-hotspot/ultralytics/tree/main/examples/YOLOv8-STEdgeAI/stedgeai_models/object_detection),  [Blazeface front](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/facedetect_front/README.md), [SSD_MobileNetV1_pt](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/ssd_mobilenetv1_pt/README.md), [SSD_MobileNetV2_pt](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/ssd_mobilenetv2_pt/README.md), [SSDLite_MobileNetV1_pt](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/ssdlite_mobilenetv1_pt/README.md), [SSDLite_MobileNetV2_pt](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/ssdlite_mobilenetv2_pt/README.md), [SSDLite_MobileNetV3Large_pt](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/ssdlite_mobilenetv3large_pt/README.md), [SSDLite_MobileNetV3Small_pt](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/ssdlite_mobilenetv3small_pt/README.md), [ST_YoloDv2Milli_pt](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/st_yolodv2milli_pt/README.md), [ST_YoloDv2Tiny_pt](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/st_yolodv2tiny_pt/README.md) |
 
 
 </details>

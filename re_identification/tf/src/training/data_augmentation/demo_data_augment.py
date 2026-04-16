@@ -15,23 +15,27 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-sys.path.append(os.path.dirname(SCRIPT_DIR))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))))
+print(ROOT_DIR)
+sys.path.append(ROOT_DIR)
 
-from re_identification.tf.src.utils import get_config
-from re_identification.tf.src.preprocessing import preprocess
 from common.data_augmentation import random_color, random_affine, random_erasing, random_misc
+from re_identification.tf.src.preprocessing import preprocess
 
 
 
-def display_images_side_by_side(image, image_aug, grayscale=None, legend=None):
+def display_images_side_by_side(image, image_aug, grayscale=None, legend=None, save_dir=None, filename=None):
     """
-    This function displays the original and augmented images side by side.
+    This function displays (or saves) the original and augmented images side by side.
 
     Args:
         images (Tuple): original images.
         images_aug (Tuple): corresponding augmented images.
-    
+        grayscale (bool): if True, display in grayscale.
+        legend (str): title for the augmented image.
+        save_dir (str): directory to save the figure. If None, plt.show() is used.
+        filename (str): filename to use when saving. Required if save_dir is not None.
+
     Returns:
         None
     """
@@ -60,15 +64,20 @@ def display_images_side_by_side(image, image_aug, grayscale=None, legend=None):
         ax2.imshow(image_aug)
     ax2.title.set_text(legend)
 
-    plt.show()
+    plt.tight_layout()
+    if save_dir and filename:
+        os.makedirs(save_dir, exist_ok=True)
+        fig.savefig(os.path.join(save_dir, filename), dpi=150, bbox_inches="tight")
+    else:
+        plt.show()
     plt.close()
-    
+
 
 def augment_images(images, fn_name=None):
 
     if fn_name == "random_contrast":
         return random_color.random_contrast(images, factor=0.7)
-        
+
     elif fn_name == "random_brightness":
         return random_color.random_brightness(images, factor=0.4)
 
@@ -81,9 +90,9 @@ def augment_images(images, fn_name=None):
     elif fn_name == "random_saturation":
         return random_color.random_saturation(images, delta=0.2)
 
-    elif fn_name == "random_value":           
-        return random_color.random_value(images, delta=0.2)        
-        
+    elif fn_name == "random_value":
+        return random_color.random_value(images, delta=0.2)
+
     elif fn_name == "random_hsv":
         return random_color.random_hsv(
                         images, hue_delta=0.1, saturation_delta=0.2, value_delta=0.2)
@@ -91,7 +100,7 @@ def augment_images(images, fn_name=None):
     elif fn_name == "random_rgb_to_hsv":
         return random_color.random_rgb_to_hsv(images, change_rate=1.0)
 
-    elif fn_name == "random_rgb_to_grayscale":        
+    elif fn_name == "random_rgb_to_grayscale":
         return random_color.random_rgb_to_grayscale(images, change_rate=1.0)
 
     elif fn_name == "random_sharpness":
@@ -149,19 +158,19 @@ def augment_images(images, fn_name=None):
         return random_affine.random_bounded_crop(images, width_factor=[-0.8,0.0])
 
 
-def demo_data_augmentation(dataset_path, grayscale=None, num_images=None):
+def demo_data_augmentation(dataset_path, grayscale=None, num_images=None, output_dir=None):
     """
-    Samples a batch of images, applies to them the data augmentation 
+    Samples a batch of images, applies to them the data augmentation
     functions specified in the YAML configuration file, and displays
     side by side the original images and augmented images.
     """
-    
+
     function_names = [
         "random_contrast", "random_brightness", "random_gamma", "random_hue",
         "random_saturation", "random_value", "random_hsv", "random_rgb_to_hsv",
-        "random_rgb_to_grayscale", "random_sharpness", "random_posterize", 
+        "random_rgb_to_grayscale", "random_sharpness", "random_posterize",
         "random_invert", "random_solarize", "random_autocontrast", "random_blur",
-        "random_gaussian_noise", "random_jpeg_quality", "random_crop", "random_flip", 
+        "random_gaussian_noise", "random_jpeg_quality", "random_crop", "random_flip",
         "random_translation", "random_rotation", "random_shear", "random_shear_x",
         "random_shear_y", "random_zoom", "random_rectangle_erasing", "random_bounded_crop"
     ]
@@ -170,7 +179,7 @@ def demo_data_augmentation(dataset_path, grayscale=None, num_images=None):
         "random_hue", "random_saturation", "random_value", "random_hsv",
         "random_rgb_to_hsv", "random_rgb_to_grayscale", "random_autocontrast"
     ]
-    
+
     # If grayscale was requested, remove the functions
     # that are only applicable to color images from
     # the list of function names.
@@ -179,19 +188,43 @@ def demo_data_augmentation(dataset_path, grayscale=None, num_images=None):
             function_names.remove(fn)
 
     # Get the class names
-    class_names = [p for p in os.listdir(dataset_path) 
+    class_names = [p for p in os.listdir(dataset_path)
                       if os.path.isdir(os.path.join(dataset_path, p))]
+
+    # If the dataset is flat (no subdirectories), extract class IDs from image filenames
+    if not class_names:
+        # For flat reid datasets, extract unique class IDs from filenames (format: id_camera_frame.jpg)
+        image_files = [f for f in os.listdir(dataset_path) if f.endswith(('.jpg', '.jpeg', '.png'))]
+        class_ids = set()
+        for img_file in image_files:
+            # Extract the first part (class ID) from filename like "00008_01_16.jpeg"
+            class_id = img_file.split('_')[0]
+            class_ids.add(class_id)
+        class_names = sorted(list(class_ids))
+
+    if not class_names:
+        raise ValueError(f"No classes found in dataset at {dataset_path}")
 
     # Create a configuration dictionary with the
     # information needed to create the data loader
     scale = 1./255
     offset = 0
     cfg = DefaultMunch.fromDict({
-                "general": { "model_path": None },
+                "use_case": "re_identification",
+                "model": { "model_path": None,
+                           "input_shape": (224, 224, 3),
+                           "framework": "tf" },
                 "operation_mode": "training",
                 "dataset": {
+                    "name": "DeepSportradar",
                     "training_path": dataset_path,
+                    "validation_path": None,
+                    "quantization_path": None,
+                    "test_query_path": None,
+                    "test_gallery_path": None,
                     "class_names": class_names,
+                    "class_names_test": [],
+                    "validation_split": 0.2,
                     "seed": None
                 },
                 "preprocessing": {
@@ -200,37 +233,47 @@ def demo_data_augmentation(dataset_path, grayscale=None, num_images=None):
                     "color_mode": "grayscale" if grayscale else "rgb",
                 },
                 "training": {
-                    "model": { "input_shape": (224, 224, 3) },
                     "batch_size": num_images,
-                    "resizing": { "interpolation": "bilinear", "aspect_ratio": "fit" },
-                    "color_mode": "grayscale" if grayscale else "rgb",
                 }
           })
- 
+    cfg.use_case = "re_identification"
+    cfg.model.framework = "tf"
+
     # Create a data loader to get examples from the training set
-    print("Dataset:", cfg.dataset.training_path)    
-    data_loader, _, _, _ = preprocess(cfg)
+    print("Dataset:", cfg.dataset.training_path)
+    data_loader, _, _, _, _ = preprocess(cfg)
+
+    # Create output directory if saving is enabled
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"Saving augmentation demo images to: {output_dir}")
+    else:
+        print("Display mode: Images will be shown (use ctrl+c to exit)")
 
     print("Demonstrating data augmentation functions:")
-    for fn in function_names:
+    for i, fn in enumerate(function_names):
         print("  " + fn)
-    
-    for i, data in enumerate(data_loader):
-        images, _ = data
-        batch_size = tf.shape(images)[0]
-        
-        # Rescale the images
-        images = scale * tf.cast(images, dtype=tf.float32) + offset
-        
-        images_aug = augment_images(images, fn_name=function_names[i])
 
-        # Plot the images and their groundtruth labels
-        for k in range(batch_size):
-            display_images_side_by_side(images[k], images_aug[k], grayscale=grayscale, legend=function_names[i])
+        for data in data_loader:
+            images = data[0]
+            images = scale * tf.cast(images, dtype=tf.float32) + offset
 
-        # Stop when all the data augmentation functions have been demo'ed
-        if i == len(function_names) - 1:
-            exit()
+            images_aug = augment_images(images, fn_name=fn)
+
+            # Plot or save the images and their groundtruth labels
+            for k in range(cfg.training.batch_size):
+                if output_dir:
+                    # One folder per augmentation function
+                    fn_dir = os.path.join(output_dir, fn)
+                    filename = f"{fn}_img{k}.png"
+                    display_images_side_by_side(images[k], images_aug[k], grayscale=grayscale, legend=fn,
+                                               save_dir=fn_dir, filename=filename)
+                else:
+                    display_images_side_by_side(images[k], images_aug[k], grayscale=grayscale, legend=fn)
+
+            # Stop when all the data augmentation functions have been demo'ed
+            if i == len(function_names) - 1:
+                exit()
 
 
 def main():
@@ -242,13 +285,16 @@ def main():
                         help='demo data augmentation functions on grayscale images')
     parser.add_argument('--num_images', type=int, default=4,
                         help='number of images to display for each data augmentation function (default: 4)')
-    
+    parser.add_argument('--output_dir', type=str, default=None,
+                        help='optional directory to save augmentation demo images (default: display only)')
+
     args = parser.parse_args()
 
     if not os.path.isdir(args.dataset_path):
         raise ValueError(f"\nCould not find dataset directory: {args.dataset_path}")
-    
-    demo_data_augmentation(args.dataset_path, grayscale=args.grayscale, num_images=args.num_images)
+
+    demo_data_augmentation(args.dataset_path, grayscale=args.grayscale, num_images=args.num_images,
+                          output_dir=args.output_dir)
 
 if __name__ == '__main__':
     main()

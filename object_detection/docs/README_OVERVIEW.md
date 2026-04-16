@@ -173,6 +173,7 @@ The exhaustive list of `model_type` and corresponding `model_name` is the follow
 |-----------------------|----------------------|
 | `yolov8n`             | X         |
 | `yolov11n`            | X         |
+| `yolo26n`             | X         |
 | `yolov5u`             | X         |
 | `st_yoloxn`           | `st_yoloxn`, `st_yoloxn_d033_w025`, `st_yoloxn_d100_w025`, `st_yoloxn_d050_w040`        |
 | `st_yololcv1`         | `st_yololcv1`|
@@ -209,15 +210,19 @@ The `dataset` section and its attributes are shown in the YAML code below.
 ```yaml
 dataset:
   format: pascal_voc
-  dataset_name: pascal_voc                                    # Dataset name. Optional, defaults to "<unnamed>".
+  dataset_name: pascal_voc                                    # Dataset name. Defaults to "<unnamed>".
   class_names: [ aeroplane,bicycle,bird,boat,bottle,bus,car,cat,chair,cow,diningtable,dog,horse,motorbike,person,pottedplant,sheep,sofa,train,tvmonitor ] # Names of the classes in the dataset.
-  data_dir: ./datasets/pascal_voc/tmp/                       # Path to the tmp directory before the split.
-  train_images_path: /local/datasets/VOC0712/JPEGImages/     # Path to the root directory of the img before split.
-  train_xml_dir: /local/datasets/VOC0712/Annotations         # Path to the root directory of the xml annotations
-  training_path: <training-set-root-directory>               # Path to the root directory of the training set.
-  validation_path: <validation-set-root-directory>           # Path to the root directory of the validation set.
-  validation_split: 0.2                                      # Training/validation sets split ratio.
-  test_path: <test-set-root-directory>                       # Path to the root directory of the test set.
+  data_dir: <tmp-directory-where-tfs-will-be-saved>          # Path to the tmp directory before the split.
+  train_images_path: <JPEGImages-root-directory>             # Path to the root directory of the img before split.
+  train_annotations_path: <path-to-the-Annotations-dir>      # Path to the root directory of the xml annotations
+  val_images_path: <JPEGImages-root-directory>               # Path to the root directory of the img (usually the same as train_images_path).
+  val_annotations_path: <path-to-the-Annotations-dir>        # Path to the root directory of the xml annotations (usually the same as train_annotations_path)
+  test_images_path: <JPEGImages-root-directory>              # Path to the root directory of the img (usually the same as train_images_path).
+  test_annotations_path: <path-to-the-Annotations-dir>       # Path to the root directory of the xml annotations (usually the same as train_annotations_path)
+  train_split:  <path-to-the-ImageSets/Main/train.txt>       # Path to the .txt file containing the split for training.
+  val_split:  <path-to-the-ImageSets/Main/val.txt>           # Path to the .txt file containing the split for training. (Optional)
+  test_split:  <path-to-the-ImageSets/Main/test.txt>         # Path to the .txt file containing the split for training. (Optional)
+  # validation_split: 0.2                                    # Training/validation sets split ratio. (Optional if val_*_path is defined)
   quantization_path: <quantization-set-root-directory>       # Path to the root directory of the quantization set.
   quantization_split:                                        # Quantization split ratio.
   seed: 123                                                  # Random generator seed used when splitting a dataset.
@@ -245,21 +250,36 @@ This determines whether it is needed to convert the dataset to the required TFS 
 
 Depending on the `format` value, some additional attributes should be defined in the dataset section:
 - If the `format` is set to **coco**, the following attributes should be set:
-  * The `data_dir`: Required, refers to the temporary path where the TFS files will be generated.
+  * The `data_dir`: Required if `download_data` is set to True, refers to the temporary path where the dataset will be downloaded.
   * The `train_images_path`: Required, refers to the path of the training subset directory where the images are located.
-  * The `train_annotations_path`: Required, refers to the path of the training subset json file of the annotations.
+  * The `train_annotations_path`: Required, refers to the path of the training subset JSON file of the annotations.
   * The `val_images_path`: Optional, refers to the path of the validation subset directory where the images are located.
-  * The `val_annotations_path`: Optional, refers to the path of the training subset json file of the annotations.
+  * The `val_annotations_path`: Optional, refers to the path of the validation subset JSON file of the annotations.
+  * The `test_images_path`: Optional, refers to the path of the test subset (evaluation-only) directory where the images are located.
+  * The `test_annotations_path`: Optional, refers to the path of the test subset (evalutation-only) JSON file of the annotations.
+  * The `validation_split`: Optional, refers to a % ratio of the training set, should be defined if the `val_images_path` and `val_annotations_path` are missing.
 
 - If the `format` is set to **pascal_voc**, the following attributes should be set:
-  * The `data_dir`: Required, refers to the temporary path where the TFS files will be generated.
+  * The `data_dir`: Required if `download_data` is set to True, refers to the temporary path where the dataset will be downloaded.
   * The `train_images_path`: Required, refers to the path of the training subset directory where the images are located.
-  * The `train_xml_dir`: Required, refers to the path of the training subset directory containing the xml files of the annotations.
+  * The `train_annotations_path`: Required, refers to the path of the training subset directory containing the xml files of the annotations.
+  * The `train_split`: Required, refers to the train.txt containing the split IDs for training subsets.
   * The `val_images_path`: Optional, refers to the path of the validation subset directory where the images are located.
-  * The `val_xml_dir`: Optional, refers to the path of the training subset directory containing the xml files of the annotations.
+  * The `val_annotations_path`: Optional, refers to the path of the training subset directory containing the XML files of the annotations.
+  * The `val_split`: Required, refers to the val.txt containing the split IDs for validation subsets.
+  * The `test_images_path`: Optional, refers to the path of the validation subset directory where the images are located.
+  * The `test_annotations_path`: Optional, refers to the path of the training subset directory containing the XML files of the annotations.
+  * The `test_split`: Required, refers to the test.txt containing the split IDs for training subsets.
+  * The `validation_split`: Optional, refers to a % ratio of the training set, should be defined if the `val_images_path` and `val_annotations_path` are missing.
 
 - If the `format` is set to **darknet_yolo**, the following attributes should be set:
-  * The `data_dir`: Required, refers to the path of the directory containing the txt files of the annotations along with the images.
+  * The `train_images_path`: Required, refers to the path of the training subset directory where the images are located.
+  * The `train_annotations_path`: Required, refers to the path of the training subset directory containing the xml files of the annotations.
+  * The `val_images_path`: Optional, refers to the path of the validation subset directory where the images are located.
+  * The `val_annotations_path`: Optional, refers to the path of the validation subset directory containing the TXT files of the annotations.
+  * The `test_images_path`: Optional, refers to the path of the test subset (evaluation-only) directory where the images are located.
+  * The `test_annotations_path`: Optional, refers to the path of the test subset (evaluation-only) directory containing the TXT files of the annotations. 
+  * The `validation_split`: Optional, refers to a % ratio of the training set, should be defined if the `val_images_path` and `val_annotations_path` are missing.
 
 
 The state machine below describes the process of dataset loading for object detection use case.
@@ -319,9 +339,7 @@ The attribute `download_data` is a boolean flag that is supported only if the `d
 
 The `exclude_unlabeled` attribute is a boolean flag that, when set to True, instructs the dataset loader or processing script to exclude images that do not contain any labeled objects (i.e., images without annotations) from the training or evaluation dataset.
 
-When a training is run, the training set is split in two to create a validation dataset if `validation_path` is not
-provided. When a model accuracy evaluation is run, the test set is used if there is one, otherwise the validation set is
-used (either provided or generated by splitting the training set).
+When a training is run, the training set is split in two to create a validation dataset if `val_images_path` and `val_annotations_path` are not provided. When a model accuracy evaluation is run, the test set is used if there is one, otherwise the validation set is used (either provided or generated by splitting the training set).
 
 The `validation_split` attribute specifies the training/validation set size ratio to use when splitting the training set
 to create a validation set. The default value is 0.2, meaning that 20% of the training set is used to create the

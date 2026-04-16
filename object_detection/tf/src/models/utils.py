@@ -29,9 +29,7 @@ def prepare_kwargs_for_model(cfg: DictConfig):
 
 
 def model_family(model_type: str) -> str:
-    if model_type == "ssd_mobilenet_v2_fpnlite":
-        return "ssd_mobilenet_v2_fpnlite"
-    elif model_type in ("yolov2t", "st_yololcv1"):
+    if model_type in ("yolov2t", "st_yololcv1"):
         return "yolo"
     elif model_type in ("yolov8n", "yolov11n", "yolov5u"):
         return "yolov8n"
@@ -45,6 +43,8 @@ def model_family(model_type: str) -> str:
         return "st_yolod"
     elif model_type == "ssd":
         return "ssd"
+    elif model_type == "yolo26n":
+        return "yolo26n"
     else:
         raise ValueError(f"Internal error: unknown model type {model_type}")
 

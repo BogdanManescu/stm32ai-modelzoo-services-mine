@@ -49,6 +49,7 @@ def deploy(cfg: DictConfig = None, model_path_to_deploy: Optional[str] = None,
     verbosity = cfg.deployment.verbosity
     stm32ai_ide = cfg.deployment.IDE
     stm32ai_serie = cfg.deployment.hardware_setup.serie
+    build_conf = cfg.deployment.build_conf
 
     # Get model name for STM32Cube.AI STATS
     model_path = model_path_to_deploy if model_path_to_deploy else cfg.model.model_path
@@ -67,17 +68,17 @@ def deploy(cfg: DictConfig = None, model_path_to_deploy: Optional[str] = None,
     generate_mel_LUT_files(config=cfg)
 
     additional_files = ["C_header/user_mel_tables.h", "C_header/user_mel_tables.c"]
-    if stm32ai_serie.upper() in ["STM32U5","STM32N6"] and stm32ai_ide.lower() == "gcc":
-        if board == "B-U585I-IOT02A":
+    if stm32ai_serie.upper() in ["STM32U5","STM32N6","STM32U3"] and stm32ai_ide.lower() == "gcc":
+        if board == "B-U585I-IOT02A" or board == "NUCLEO-U3C5ZI-Q":
             stmaic_conf_filename = "stmaic_c_project.conf"
         elif board == "STM32N6570-DK":
             stmaic_conf_filename = "stmaic_STM32N6570-DK.conf"
         else:
             raise TypeError("The hardware selected in cfg.deployment.hardware_setup.board is not supported yet!\n"
-                            "Please choose the following boards : `[STM32U5,STM32N6]`.")
+                            "Please choose the following boards : `[B-U585I-IOT02A, STM32N6570-DK, MB2222-U3C5ZIQ] `.")
 
         # Run the deployment
-        if board == "B-U585I-IOT02A":
+        if board == "B-U585I-IOT02A" or board == "NUCLEO-U3C5ZI-Q":
             stm32ai_deploy(target=board,
                         stlink_serial_number=stlink_serial_number,
                         stedgeai_core_version=stedgeai_core_version,
@@ -97,6 +98,7 @@ def deploy(cfg: DictConfig = None, model_path_to_deploy: Optional[str] = None,
                         credentials=credentials,
                         additional_files=additional_files, 
                         on_cloud=cfg.tools.stedgeai.on_cloud,
+                        build_conf=build_conf,
                         cfg=cfg, 
                         custom_objects=AED_CUSTOM_OBJECTS)
         elif board == "STM32N6570-DK":

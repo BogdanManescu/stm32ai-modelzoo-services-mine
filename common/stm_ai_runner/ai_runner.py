@@ -1210,29 +1210,33 @@ class AiRunner:
                     ext_ = '[{} ]'.format(' '.join([counter_fmt.format(val) for val in counters_]))
                 dur_ = dur_fmt.format(durs.mean())
                 perc_ = durs.mean() * 100 / dur_all
-                perc_ = f'{perc_:.1f}%'
+                perc_ = f'{perc_:.2f}%'
                 perc_cumul += (durs.mean() * 100 / dur_all)
                 dur_cumul += durs.mean()
                 row = [c_id, c_node['m_id'], c_node['layer_desc'], dur_, perc_,
-                       f'{perc_cumul:.1f}% ', ext_, c_node['name']]
+                       f'{perc_cumul:.2f}% ', ext_, c_node['name']]
                 table_w.add_row(row)
             perf_counters_cumul_res = ''
             if perf_counters_cumul:
                 perf_counters_cumul_res = '[{} ]'.format(' '.join([counter_fmt.format(val)
                                                                   for val in perf_counters_cumul]))
 
-            if dur_cumul < dur_all:
-                table_w.add_separator()
+            # device-specific code
+            if profiler['info']['device']['dev_type'] == "ispu":
+                # dur_all comes from another measure than the sum of time spent on each layer for ISPU
+                # if the two values are different, "inter-nodal" row is shown.
+                if dur_cumul < dur_all:
+                    table_w.add_separator()
 
-                no_layer_dur = dur_all - dur_cumul
-                dur_ = dur_fmt.format(no_layer_dur)
-                perc_ = no_layer_dur * 100 / dur_all
-                perc_ = f'{perc_:.1f}%'
-                perc_cumul += (no_layer_dur * 100 / dur_all)
-                dur_cumul += no_layer_dur
+                    no_layer_dur = dur_all - dur_cumul
+                    dur_ = dur_fmt.format(no_layer_dur)
+                    perc_ = no_layer_dur * 100 / dur_all
+                    perc_ = f'{perc_:.2f}%'
+                    perc_cumul += (no_layer_dur * 100 / dur_all)
+                    dur_cumul += no_layer_dur
 
-                row = ['n/a', 'n/a', 'Inter-nodal', dur_, perc_, f'{perc_cumul:.1f}% ', '', 'n/a']
-                table_w.add_row(row)
+                    row = ['n/a', 'n/a', 'Inter-nodal', dur_, perc_, f'{perc_cumul:.2f}% ', '', 'n/a']
+                    table_w.add_row(row)
 
             table_w.add_separator()
             table_w.add_row(['total', '', '', dur_fmt.format(dur_cumul), '', '', perf_counters_cumul_res, ''])

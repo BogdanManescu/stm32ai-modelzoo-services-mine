@@ -35,10 +35,26 @@ def gen_h_user_file_n6(config: DictConfig = None, quantized_model_path: str = No
             self.__dict__.update(entries)
 
     params = Flags(**config)
-    interpreter_quant = tf.lite.Interpreter(model_path=quantized_model_path)
-    input_details = interpreter_quant.get_input_details()[0]
-    output_details = interpreter_quant.get_output_details()[0]
-    input_shape = input_details['shape']
+
+    if quantized_model_path.lower().endswith('.tflite'):
+        interpreter_quant = tf.lite.Interpreter(model_path=quantized_model_path)
+        input_details = interpreter_quant.get_input_details()[0]
+        output_details = interpreter_quant.get_output_details()[0]
+        input_shape = input_details['shape']
+    elif quantized_model_path.lower().endswith('.onnx'):
+        import onnxruntime
+
+
+        params = config
+
+        model = onnxruntime.InferenceSession(quantized_model_path)
+        inputs  = model.get_inputs()
+        outputs = model.get_outputs()
+        input_shape_raw = inputs[0].shape
+        input_shape = [1,input_shape_raw[2],input_shape_raw[3],input_shape_raw[1]]
+    else:
+        raise TypeError("Please provide a TFLITE or ONNX model for N6 deployment")
+    
     class_name = config.dataset.class_names[0] if config.dataset.class_names is not None else 'None'
 
     path = os.path.join(HydraConfig.get().runtime.output_dir, "C_header/")
@@ -106,7 +122,12 @@ def gen_h_user_file_n6(config: DictConfig = None, quantized_model_path: str = No
             f.write("#define AI_SPE_MOVENET_POSTPROC_HEATMAP_HEIGHT       (STAI_NETWORK_IN_1_HEIGHT/4)\n")
             f.write("#define AI_SPE_MOVENET_POSTPROC_NB_KEYPOINTS         (AI_POSE_PP_POSE_KEYPOINTS_NB)\n\n")
         elif params.model.model_type == "yolo_mpe":
-            out_shape = output_details["shape"]
+            if quantized_model_path.lower().endswith('.tflite'):
+                out_shape = output_details["shape"]
+            elif quantized_model_path.lower().endswith('.onnx'):
+                out_shape = outputs[0].shape
+            else:
+                raise TypeError("Please provide a TFLITE or ONNX model for N6 deployment")
             nb_kpt = params.dataset.keypoints
             f.write("#define AI_POSE_PP_CONF_THRESHOLD                    ({})\n".format(float(params.postprocessing.kpts_conf_thresh)))
             f.write("#define AI_POSE_PP_POSE_KEYPOINTS_NB                 ({})\n".format(int(nb_kpt)))

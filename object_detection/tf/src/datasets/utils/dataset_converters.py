@@ -69,6 +69,83 @@ def verify_voc_classes(xml_folder: str = None,
     classes_inspector(non_existing_classes,
                       available_classes)
 
+def convert_voc_split_to_yolo(images_folder: str,
+                              annotations_folder: str,
+                              split_file: str,
+                              classes: list,
+                              export_folder: str) -> None:
+    """
+    Convert a Pascal VOC split defined by a split file (train.txt, val.txt, test.txt)
+    to YOLO text labels.
+    """
+    if not os.path.isfile(split_file):
+        raise ValueError(f"Split file not found: {split_file}")
+    if not os.path.isdir(images_folder):
+        raise ValueError(f"Images folder not found: {images_folder}")
+    if not os.path.isdir(annotations_folder):
+        raise ValueError(f"Annotations folder not found: {annotations_folder}")
+    if not classes:
+        raise ValueError("classes must be a non-empty list")
+
+    os.makedirs(export_folder, exist_ok=True)
+
+    with open(split_file, "r") as f:
+        image_ids = [line.strip().split()[0] for line in f if line.strip()]
+
+    for img_id in tqdm(image_ids, desc=f"Converting VOC split {os.path.basename(split_file)}"):
+        xml_path = os.path.join(annotations_folder, f"{img_id}.xml")
+        if not os.path.isfile(xml_path):
+            continue  # skip missing annotations
+
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+        size = root.find("size")
+        if size is None:
+            continue
+
+        width_node = size.find("width")
+        height_node = size.find("height")
+        if width_node is None or height_node is None:
+            continue
+
+        width = int(width_node.text)
+        height = int(height_node.text)
+
+        txt_path = os.path.join(export_folder, f"{img_id}.txt")
+
+        for obj in root.findall("object"):
+            name_node = obj.find("name")
+            bbox = obj.find("bndbox")
+
+            if name_node is None or bbox is None:
+                continue
+
+            name = name_node.text
+            if name not in classes:
+                continue
+
+            xmin_node = bbox.find("xmin")
+            ymin_node = bbox.find("ymin")
+            xmax_node = bbox.find("xmax")
+            ymax_node = bbox.find("ymax")
+
+            if None in (xmin_node, ymin_node, xmax_node, ymax_node):
+                continue
+
+            xmin = float(xmin_node.text)
+            ymin = float(ymin_node.text)
+            xmax = float(xmax_node.text)
+            ymax = float(ymax_node.text)
+
+            x_center = (xmin + xmax) / (2.0 * width)
+            y_center = (ymin + ymax) / (2.0 * height)
+            w = (xmax - xmin) / width
+            h = (ymax - ymin) / height
+
+            class_id = classes.index(name)
+            with open(txt_path, "a") as label_file:
+                label_file.write(f"{class_id} {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}\n")
+
 
 def convert_voc_to_yolo(xml_folder: str = None,
                         images_folder: str = None,
@@ -192,7 +269,6 @@ def convert_coco_to_yolo(coco_annotations_file: str = None,
                         class_name = category['name']
                         break
                 if class_name in classes:
-                    copy_image = True
                     class_id = classes.index(class_name)
                     x, y, w, h = annotation['bbox']
                     x_center = x + (w / 2)
@@ -299,64 +375,96 @@ def convert_kitti_to_yolo(kitti_annotations_dir: str = None,
 
 def convert_val_dataset_to_yolo(cfg: DictConfig) -> None:
     """
-    Converts only the validatin dataset to YOLO Darknet format according to the config.
-    This is required for the case when loading the validation dataset only.
+    Converts only the validation/test dataset to YOLO Darknet format according to the config.
+    This is used when loading the validation/test dataset only (e.g., evaluation-only).
+
+    For COCO:
+        - Validation/test set is converted to cfg.dataset.test_path.
+
+    For Pascal VOC:
+        - Validation/test set is converted to cfg.dataset.test_path.
 
     Args:
         cfg (DictConfig): Configuration dictionary containing:
-            - dataset.format: Format of the input dataset
-            - dataset.val_annotations_path: Path to validation annotations (optional)
-            - dataset.val_images_path: Path to validation images (optional)
+            - dataset.format: Format of the input dataset ("coco", "pascal_voc", "yolo_darknet", ...)
+            - COCO:
+                - dataset.val_annotations_path: Path to validation annotations
+                - dataset.val_images_path: Path to validation images
+            - Pascal VOC:
+                - dataset.val_xml_dir: Path to validation XML annotations directory
+                - dataset.val_images_path: Path to validation images
             - dataset.class_names: List of class names
-            - dataset.training_path: Output path for converted training data
-            - dataset.validation_path: Output path for converted validation data (optional)
+            - dataset.test_path: Output path for converted validation/test data (required in this context)
 
     Returns:
         None
     """
 
-    if cfg.dataset.format == "coco":
-        if (hasattr(cfg.dataset, 'val_annotations_file_path') and
-            hasattr(cfg.dataset, 'val_images_path') and
-            hasattr(cfg.dataset, 'data_dir') and
-            cfg.dataset.val_annotations_file_path and
-            cfg.dataset.val_images_path and
-            cfg.dataset.data_dir):
+    dataset_format = getattr(cfg.dataset, "format", None)
 
-            print("\nConverting validation set to YOLO format...")
-            convert_coco_to_yolo(cfg.dataset.val_annotations_file_path,
-                                 cfg.dataset.val_images_path,
-                                 cfg.dataset.class_names,
-                                 cfg.dataset.data_dir)
-        else:
-            raise ValueError(f"val_annotations_file_path, val_images_path and data_dir must be specified while evaluating on COCO format dataset.")
+    if dataset_format == "coco":
+        test_annotations = getattr(cfg.dataset, "test_annotations_path", None)
+        test_images = getattr(cfg.dataset, "test_images_path", None)
 
+        if not test_images or not os.path.isdir(test_images):
+            raise ValueError("dataset.test_images_path must point to a valid directory.")
+        if not test_annotations or not os.path.isfile(test_annotations):
+            raise ValueError("dataset.test_annotations_path must point to a valid JSON file.")
+        if not getattr(cfg.dataset, "class_names", None):
+            raise ValueError("cfg.dataset.class_names must be specified for COCO format")
+        
+        raw_root = os.path.dirname(os.path.abspath(test_images))
+        test_out_root = os.path.join(raw_root, "tfs_labels", "test")
+        os.makedirs(test_out_root, exist_ok=True)
+        cfg.dataset.test_path = test_out_root
 
-    elif cfg.dataset.format == "pascal_voc":
-        # Convert validation set if all required paths are provided
-        if (hasattr(cfg.dataset, 'val_xml_files_path') and
-            hasattr(cfg.dataset, 'val_images_path') and
-            hasattr(cfg.dataset, 'data_dir') and
-            cfg.dataset.val_xml_dir and
-            cfg.dataset.val_images_path and
-            cfg.dataset.data_dir):
+        print(f"\nConverting COCO validation/test set to YOLO format in '{test_out_root}'...")
+        convert_coco_to_yolo(
+            coco_annotations_file=test_annotations,
+            coco_images_dir=test_images,
+            classes=cfg.dataset.class_names,
+            export_folder=test_out_root,
+        )
 
-            print("\nConverting validation set to YOLO format...")
-            convert_voc_to_yolo(cfg.dataset.val_xml_dir,
-                               cfg.dataset.val_images_path,
-                               cfg.dataset.class_names,
-                               cfg.dataset.data_dir)
-        else:
-            raise ValueError(f"val_xml_files_path, val_images_path and data_dir must be specified while evaluating on PASCAL_VOC format dataset.")
+    elif dataset_format == "pascal_voc":
+        # Prefer test split if provided, otherwise fallback to val split
+        test_images = getattr(cfg.dataset, "test_images_path", None)
+        test_ann = getattr(cfg.dataset, "test_annotations_path", None)
+        test_split = getattr(cfg.dataset, "test_split", None)
 
-    elif cfg.dataset.format == "yolo_darknet":
+        if not test_images or not os.path.isdir(test_images):
+            raise ValueError("dataset.test_images_path must point to a valid directory.")
+        if not test_ann or not os.path.isdir(test_ann):
+            raise ValueError("dataset.test_annotations_path must point to a valid directory.")
+        if not test_split or not os.path.isfile(test_split):
+            raise ValueError("dataset.test_split must point to a valid split file.")
+        if not getattr(cfg.dataset, "class_names", None):
+            raise ValueError("cfg.dataset.class_names must be specified for Pascal VOC format")
+        
+        raw_root = os.path.dirname(os.path.abspath(test_images))
+        test_out_root = os.path.join(raw_root, "tfs_labels", "test")
+        os.makedirs(test_out_root, exist_ok=True)
+        cfg.dataset.test_path = test_out_root
+
+        print(f"\nConverting Pascal VOC validation/test split to YOLO format in '{test_out_root}'...")
+        convert_voc_split_to_yolo(
+            images_folder=test_images,
+            annotations_folder=test_ann,
+            split_file=test_split,
+            classes=cfg.dataset.class_names,
+            export_folder=test_out_root,
+        )
+
+    elif dataset_format == "yolo_darknet":
         print("Dataset is already in YOLO format. No conversion needed.")
         return
 
     else:
-        print("Please make sure that you selected one of the following formats: {}, {}, {}, {}".format(
-            "coco", "pascal_voc", "yolo_darknet", "kitti"))
-        print("Exiting the script...")
+        print(
+            "Please make sure that you selected one of the following formats: {}, {}, {}, {}".format(
+                "coco", "pascal_voc", "yolo_darknet", "kitti"
+            )
+        )
         sys.exit()
 
 def convert_dataset_to_yolo(cfg: DictConfig) -> None:
@@ -364,71 +472,170 @@ def convert_dataset_to_yolo(cfg: DictConfig) -> None:
     Converts the dataset to YOLO Darknet format according to the config.
     If validation paths are provided, converts both training and validation sets.
 
+    For COCO:
+        - Training set is converted to cfg.dataset.training_path if defined,
+          otherwise to cfg.dataset.data_dir.
+        - Validation set is converted to cfg.dataset.validation_path if defined,
+          otherwise to cfg.dataset.data_dir.
+          If val_images_path and val_annotations_path are specified, validation_path
+          MUST be defined.
+
+    For Pascal VOC:
+        - Training set is converted to cfg.dataset.training_path if defined,
+          otherwise to cfg.dataset.data_dir.
+        - Validation set is converted to cfg.dataset.validation_path if defined,
+          otherwise to cfg.dataset.data_dir.
+          If val_images_path and val_xml_dir are specified, validation_path
+          MUST be defined.
+
     Args:
         cfg (DictConfig): Configuration dictionary containing:
-            - dataset.format: Format of the input dataset
-            - dataset.train_annotations_path: Path to training annotations
-            - dataset.train_images_path: Path to training images
-            - dataset.val_annotations_path: Path to validation annotations (optional)
-            - dataset.val_images_path: Path to validation images (optional)
-            - dataset.class_names: List of class names
-            - dataset.training_path: Output path for converted training data
-            - dataset.validation_path: Output path for converted validation data (optional)
+            - dataset.format: "coco", "pascal_voc", "yolo_darknet", ...
+            - COCO:
+                - dataset.train_annotations_path
+                - dataset.train_images_path
+                - dataset.val_annotations_path (optional)
+                - dataset.val_images_path (optional)
+            - Pascal VOC:
+                - dataset.train_xml_dir
+                - dataset.train_images_path
+                - dataset.val_xml_dir (optional)
+                - dataset.val_images_path (optional)
+            - dataset.class_names
+            - dataset.data_dir
+            - dataset.training_path (optional)
+            - dataset.validation_path (optional)
 
     Returns:
         None
     """
 
-    if cfg.dataset.format == "coco":
-        # Convert training set
-        print("Converting training set to YOLO format...")
-        convert_coco_to_yolo(cfg.dataset.train_annotations_path,
-                            cfg.dataset.train_images_path,
-                            cfg.dataset.class_names,
-                            cfg.dataset.data_dir)
+    dataset_format = getattr(cfg.dataset, "format", None)
 
-        # Convert validation set if all required paths are provided
-        if (hasattr(cfg.dataset, 'val_annotations_file_path') and
-            hasattr(cfg.dataset, 'val_images_path') and
-            hasattr(cfg.dataset, 'data_dir') and
-            cfg.dataset.val_annotations_file_path and
-            cfg.dataset.val_images_path and
-            cfg.dataset.data_dir):
+    def _get_output_root(split: str) -> str:
+        """
+        split: "train" or "val"
+        """
+        if split == "train":
+            out = getattr(cfg.dataset, "training_path", None)
+        elif split == "val":
+            out = getattr(cfg.dataset, "validation_path", None)
+        else:
+            raise ValueError(f"Unsupported split '{split}'")
+        if not out:
+            out = getattr(cfg.dataset, "data_dir", None)
+        if not out:
+            raise ValueError(f"Could not determine output directory for split '{split}'. "
+                             f"Please specify dataset.{split}ing_path or dataset.data_dir in cfg."
+            )
 
-            print("\nConverting validation set to YOLO format...")
-            convert_coco_to_yolo(cfg.dataset.val_annotations_file_path,
-                                 cfg.dataset.val_images_path,
-                                 cfg.dataset.class_names,
-                                 cfg.dataset.data_dir)
+        os.makedirs(out, exist_ok=True)
+        return out
 
-    elif cfg.dataset.format == "pascal_voc":
-        # Convert training set
-        print("Converting training set to YOLO format...")
-        convert_voc_to_yolo(cfg.dataset.train_xml_dir,
-                           cfg.dataset.train_images_path,
-                           cfg.dataset.class_names,
-                           cfg.dataset.data_dir)
+    if dataset_format == "coco":
+        if not getattr(cfg.dataset, "train_annotations_path", None):
+            raise ValueError("cfg.dataset.train_annotations_path must be specified for COCO format")
+        if not getattr(cfg.dataset, "train_images_path", None):
+            raise ValueError("cfg.dataset.train_images_path must be specified for COCO format")
+        if not getattr(cfg.dataset, "class_names", None):
+            raise ValueError("cfg.dataset.class_names must be specified")
 
-        # Convert validation set if all required paths are provided
-        if (hasattr(cfg.dataset, 'val_xml_files_path') and
-            hasattr(cfg.dataset, 'val_images_path') and
-            hasattr(cfg.dataset, 'data_dir') and
-            cfg.dataset.val_xml_dir and
-            cfg.dataset.val_images_path and
-            cfg.dataset.data_dir):
+        # Validation presence check (for the stricter requirement on validation_path)
+        train_images = getattr(cfg.dataset, "train_images_path", None)
+        train_ann = getattr(cfg.dataset, "train_annotations_path", None)
+        val_imgs = getattr(cfg.dataset, "val_images_path", None)
+        val_ann  = getattr(cfg.dataset, "val_annotations_path", None)
 
-            print("\nConverting validation set to YOLO format...")
-            convert_voc_to_yolo(cfg.dataset.val_xml_dir,
-                               cfg.dataset.val_images_path,
-                               cfg.dataset.class_names,
-                               cfg.dataset.data_dir)
+        raw_root = os.path.dirname(os.path.abspath(train_images))
+        train_out_root = os.path.join(raw_root, "tfs_labels", "train")
+        os.makedirs(train_out_root, exist_ok=True)
 
-    elif cfg.dataset.format == "yolo_darknet":
+        print(f"Converting COCO training set to YOLO format in '{train_out_root}'...")
+        convert_coco_to_yolo(
+            coco_annotations_file=train_ann,
+            coco_images_dir=train_images,
+            classes=cfg.dataset.class_names,
+            export_folder=train_out_root,
+        )
+
+         # Optional explicit validation split
+        has_explicit_val = bool(
+            val_imgs and os.path.isdir(val_imgs) and
+            val_ann and os.path.isfile(val_ann)
+        )
+
+        if has_explicit_val:
+            val_out_root = os.path.join(raw_root, "tfs_labels", "val")
+            os.makedirs(val_out_root, exist_ok=True)
+            
+            print(f"\nConverting COCO validation set to YOLO format in '{val_out_root}'...")
+            convert_coco_to_yolo(
+                val_ann,
+                val_imgs,
+                cfg.dataset.class_names,
+                val_out_root,
+            )
+        else:
+            print("\nCOCO validation paths not fully specified; skipping validation conversion.")
+
+    elif dataset_format == "pascal_voc":
+        # Minimal Pascal VOC config using splits
+        images_path = getattr(cfg.dataset, "train_images_path", None)
+        ann_path = getattr(cfg.dataset, "train_annotations_path", None)
+        train_split = getattr(cfg.dataset, "train_split", None)
+        val_images_path = getattr(cfg.dataset, "val_images_path", None)
+        val_ann_path = getattr(cfg.dataset, "val_annotations_path", None)
+        val_split = getattr(cfg.dataset, "val_split", None)
+
+        if not images_path or not os.path.isdir(images_path):
+            raise ValueError("dataset.train_images_path must point to a valid directory.")
+        if not ann_path or not os.path.isdir(ann_path):
+            raise ValueError("dataset.train_annotations_path must point to a valid directory.")
+        if not train_split or not os.path.isfile(train_split):
+            raise ValueError("dataset.train_split must point to a valid split file.")
+        if not getattr(cfg.dataset, "class_names", None):
+            raise ValueError("cfg.dataset.class_names must be specified for Pascal VOC format")
+
+
+        raw_root = os.path.dirname(os.path.abspath(images_path))
+        train_out_root = os.path.join(raw_root, "tfs_labels", "train")
+        os.makedirs(train_out_root, exist_ok=True)
+
+        print(f"Converting Pascal VOC training split to YOLO format in '{train_out_root}'...")
+        convert_voc_split_to_yolo(
+            images_folder=images_path,
+            annotations_folder=ann_path,
+            split_file=train_split,
+            classes=cfg.dataset.class_names,
+            export_folder=train_out_root,
+        )
+        
+        has_explicit_val = bool(
+            val_images_path and os.path.isdir(val_images_path) and
+            val_ann_path and os.path.isdir(val_ann_path) and
+            val_split and os.path.isfile(val_split)
+        )
+
+        if has_explicit_val:
+            val_out_root = os.path.join(raw_root, "tfs_labels", "val")
+            os.makedirs(val_out_root, exist_ok=True)
+            print(f"\nConverting Pascal VOC validation split to YOLO format in '{val_out_root}'...")
+            convert_voc_split_to_yolo(
+                images_folder=val_images_path,
+                annotations_folder=val_ann_path,
+                split_file=val_split,
+                classes=cfg.dataset.class_names,
+                export_folder=val_out_root,
+            )
+            
+        else:
+            print("\nPascal VOC validation paths/split not fully specified; skipping validation conversion.")
+
+    elif dataset_format == "yolo_darknet":
         print("Dataset is already in YOLO format. No conversion needed.")
         return
 
     else:
         print("Please make sure that you selected one of the following formats: {}, {}, {}, {}".format(
-            "coco", "pascal_voc", "yolo_darknet", "kitti"))
-        print("Exiting the script...")
+             "coco", "pascal_voc", "yolo_darknet", "kitti"))
         sys.exit()

@@ -10,9 +10,9 @@
 
 import os
 import warnings
+import tensorflow as tf
 import mlflow
 import numpy as np
-import tensorflow as tf
 from omegaconf import DictConfig
 from common.utils import plot_confusion_matrix, log_to_file, compute_confusion_matrix2, count_h5_parameters
 from audio_event_detection.tf.src.utils import get_loss

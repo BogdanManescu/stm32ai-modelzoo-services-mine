@@ -261,7 +261,7 @@ def get_config(config_data: DictConfig) -> DefaultMunch:
         # If dataset is FSD50K, parse its dedicated section
         # No need to have this section if all we're doing is deploying,
         if cfg.dataset.dataset_name.lower() == 'fsd50k' and cfg.operation_mode != "deployment":
-                _parse_dataset_specific_fsd50k_section(cfg.dataset_specific.fsd50k)
+            _parse_dataset_specific_fsd50k_section(cfg.dataset_specific.fsd50k)
 
         _parse_preprocessing_section(cfg.preprocessing)
         _parse_feature_extraction_section(cfg.feature_extraction)

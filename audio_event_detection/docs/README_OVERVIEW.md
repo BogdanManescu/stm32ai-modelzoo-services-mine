@@ -251,7 +251,7 @@ A quick reference for which models are available within the zoo :
 
 **Yamnets**
 
-Different versions of Yamnet. The number at the end denotes the size of the embeddings. Note that the versions with embeddings of size 512 and 1024 are too large to fit on STM32U5, but fit on STM32N6.
+Different versions of Yamnet. The number at the end denotes the size of the embeddings. Note that the versions with embeddings of size 512 and 1024 are too large to fit on STM32U5 or STM32U3, but fit on STM32N6.
 
 - `yamnet_e256`
 - `yamnet_e512`
@@ -772,9 +772,9 @@ The model file can be either:
 - a TFlite model file (quantized model) with a .tflite filename extension
 - an ONNX model file (quantized model) with an .onnx filename extension.
  
-The `board` attribute is used to provide the name of the STM32 board to benchmark the model on. The available boards are 'STM32N6570-DK', 'STM32H747I-DISCO', 'STM32H7B3I-DK', 'STM32F469I-DISCO', 'B-U585I-IOT02A', 'STM32L4R9I-DISCO', 'NUCLEO-H743ZI2', 'STM32H747I-DISCO', 'STM32H735G-DK', 'STM32F769I-DISCO', 'NUCLEO-G474RE', 'NUCLEO-F401RE' and 'STM32F746G-DISCO'.
+The `board` attribute is used to provide the name of the STM32 board to benchmark the model on. The available boards are 'STM32N6570-DK', 'STM32H747I-DISCO', 'STM32H7B3I-DK', 'STM32F469I-DISCO', 'B-U585I-IOT02A', 'NUCLEO-U3C5ZI-Q', 'STM32L4R9I-DISCO', 'NUCLEO-H743ZI2', 'STM32H747I-DISCO', 'STM32H735G-DK', 'STM32F769I-DISCO', 'NUCLEO-G474RE', 'NUCLEO-F401RE' and 'STM32F746G-DISCO'.
 
-For AED, the only boards available for deployment are the B-U585I-IOT02A and STM32N6570-DK and so we recommend setting `board` to 'B-U585I-IOT02A' or 'STM32N6570-DK'.
+For AED, the only boards available for deployment are the B-U585I-IOT02A, STM32N6570-DK and NUCLEO-U3C5ZI-Q and so we recommend setting `board` to 'B-U585I-IOT02A' , 'STM32N6570-DK' or 'NUCLEO-U3C5ZI-Q'.
 
 </details></ul>
 <ul><details open><summary><a href="#3-17">3.17 Deployment</a></summary><a id="3-17"></a>
@@ -782,7 +782,7 @@ For AED, the only boards available for deployment are the B-U585I-IOT02A and STM
 The YAML code below shows how to deploy a model on an STM32 board.
 Note that you need a preprocessing and feature_extraction section, even though no data is being preprocessed. This is because the parameters in these sections are being used to create look-up tables that are used by the C application to preprocess data on the board in realtime and to parametrize the preprocessing library used in the C application.
 
-You can deploy your AED models on two different boards : B-U585I-IOT02A and STM32N6570-DK. Consult the [deployment tutorial README](./README_DEPLOYMENT.md) for a detailed deployment tutorial on both of these boards.
+You can deploy your AED models on three different boards : B-U585I-IOT02A, STM32N6570-DK and NUCLEO-U3C5ZI-Q. Consult the [deployment tutorial README](./README_DEPLOYMENT.md) for a detailed deployment tutorial on all three of these boards.
 
 ```yaml
 model:
@@ -828,7 +828,7 @@ tools:
   path_to_cubeIDE: C:/ST/STM32CubeIDE_<*.*.*>/STM32CubeIDE/stm32cubeide.exe
 
 benchmarking:
-  board: B-U585I-IOT02A # or  STM32N6570-DK
+  board: B-U585I-IOT02A # or STM32N6570-DK or NUCLEO-U3C5ZI-Q
 
 deployment:
   c_project_path: ../application_code/sensing/STM32U5
@@ -846,6 +846,8 @@ The model file must be a TFlite model file (quantized model) with a '.tflite' fi
 The class names have to be provided as there is no dataset to infer them from.
 
 - `c_project_path` : *Path*, Path to the C application. Should be `../../application_code/sensing/STM32U5` if deploying on B-U585I-IOT02A.
+  
+- If deploying on NUCLEO-U3C5ZI-Q, should be `../../application_code/audio/STM32U3`
 
 - If deploying on STM32N6570-DK, should be `../../application_code/audio/STM32N6`
 
@@ -869,15 +871,39 @@ deployment:
                                # Set to 0 to disable. To enable, set to any float between 0 and 1.
 ```
 
+And here is an example version for deployment on NUCLEO-U3C5ZI-Q :
+
+```yaml
+tools:
+  stedgeai:
+    optimization: balanced
+    on_cloud: False
+    path_to_stedgeai: C:/ST/STEdgeAI/<x.y>/Utilities/windows/stedgeai.exe
+    hsp: 4096 # Set to None to disable HSP for the model. Only 4096 or None are supported for now.
+  path_to_cubeIDE: C:/ST/STM32CubeIDE_<*.*.*>/STM32CubeIDE/stm32cubeide.exe
+  
+deployment:
+  c_project_path: ../application_code/audio/STM32U3
+  IDE: GCC
+  verbosity: 1
+  hardware_setup:
+    serie: STM32U3
+    board: NUCLEO-U3C5ZI-Q
+  unknown_class_threshold: 0.0 # Threshold used for OOD detection. Mutually exclusive with use_garbage_class
+                               # Set to 0 to disable. To enable, set to any float between 0 and 1.
+  build_conf: Debug # Use "Debug" to enable HSP for preprocessing, and use "Debug_No_HSP" to disable HSP for preprocessing.
+```
 
 
-- **IMPORTANT NOTE : The baud rate used in the serial port for the two versions is different. If using `../../application_code/sensing/STM32U5`, the expected baud rate is 115200.**
+
+
+- **IMPORTANT NOTE : The baud rate used in the serial port for the three versions is different. If using `../../application_code/sensing/STM32U5` or `../../application_code/audio/STM32U3`, the expected baud rate is 115200.**
 
 - **If deploying on STM32N6 using the application loacated in `application_code/audio/STM32N6/`, the expected baud rate is 14400 !**
 
 - `ide` : Toolchain to use for compiling the C application. Should be `GCC`
 - `verbosity` : Verbosity of the compiler
-- `hardware_setup` : Series and board on which to dpeloy the model. Currently, only the B-U585I-IOT02A and STM32N6570-DK boards are supported
+- `hardware_setup` : Series and board on which to dpeloy the model. Currently, only the B-U585I-IOT02A, STM32N6570-DK and NUCLEO-U3C5ZI-Q boards are supported
 - `unknown_class_threshold` : *float*, used to perform OOD detection. If > 0, thresholds the model output probabilities, and if the maximum probability is below this threshold, displays "Unknown class" instead of the model prediction.
 **WARNING : Mutually exclusive with `dataset.use_garbage_class`**. Consult the section on OOD detection in the model zoo for more details.
 
@@ -1154,7 +1180,7 @@ A quick reference for which models are available within the zoo :
 
 **Yamnets**
 
-Different versions of Yamnet. The number at the end denotes the size of the embeddings. Note that the versions with embeddings of size 512 and 1024 are too large to fit on STM32U5, but fit on STM32N6.
+Different versions of Yamnet. The number at the end denotes the size of the embeddings. Note that the versions with embeddings of size 512 and 1024 are too large to fit on STM32U5 or STM32U3, but fit on STM32N6.
 
 - `yamnet_e256`
 - `yamnet_e512`

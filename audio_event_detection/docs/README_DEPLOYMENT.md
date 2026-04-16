@@ -2,7 +2,10 @@
 
 This tutorial shows how to deploy your pre-trained keras, ONNX or tflite models on an STM32 board using *STEdgeAI*.
 
-In addition, this tutorial will also explain how to deploy a model from the **[ST public model zoo](./README_MODELS.md)** directly on your *STM32 target board*. In this version deployment on the [B-U585I-IOT02A](https://www.st.com/en/evaluation-tools/b-u585i-iot02a.html), and [STM32N6570-DK](https://www.st.com/en/evaluation-tools/stm32n6570-dk.html) are supported.
+In addition, this tutorial will also explain how to deploy a model from the **[ST public model zoo](./README_MODELS.md)** directly on your *STM32 target board*. In this version deployment on the [B-U585I-IOT02A](https://www.st.com/en/evaluation-tools/b-u585i-iot02a.html), [STM32N6570-DK](https://www.st.com/en/evaluation-tools/stm32n6570-dk.html) and [NUCLEO-U3C5ZI-Q](https://www.st.com/en/evaluation-tools/nucleo-u3c5zi-q.html) are supported.
+If running on [NUCLEO-U3C5ZI-Q](https://www.st.com/en/evaluation-tools/nucleo-u3c5zi-q.html), you will additionally require the [X-NUCLEO-IKS02A1](https://www.st.com/en/evaluation-tools/x-nucleo-iks02a1.html) expansion board, as the U3C5 does not come with a microphone.
+
+Deployment on [NUCLEO-U3C5ZI-Q](https://www.st.com/en/evaluation-tools/nucleo-u3c5zi-q.html) supports use of the board's HSP feature : it is enabled by default both to accelerate the model and the preprocessing. See section <a href="#2-7">2.7 Configuring the deployment section</a> for more details.
 
 We strongly recommend following the [training tutorial](./README_TRAINING.md) first.
 
@@ -14,7 +17,8 @@ Please check out [STM32 model zoo](./README_MODELS.md) for audio event detection
 
 <ul><details open><summary><a href="#1-1">1.1 Hardware Setup</a></summary><a id="1-1"></a>
 
-The [STM32 C application](../../application_code/sensing/STM32U5/README.md) is running on an STMicroelectronics evaluation kit board called [B-U585I-IOT02A](https://www.st.com/en/evaluation-tools/b-u585i-iot02a.html), or on the [STM32N6570-DK](https://www.st.com/en/evaluation-tools/stm32n6570-dk.html). The current version of the application code only supports usage of the digital microphone on both boards.
+The [STM32 C application](../../application_code/sensing/STM32U5/README.md) is running on an STMicroelectronics evaluation kit board called [B-U585I-IOT02A](https://www.st.com/en/evaluation-tools/b-u585i-iot02a.html), on the [STM32N6570-DK](https://www.st.com/en/evaluation-tools/stm32n6570-dk.html), or on the [NUCLEO-U3C5ZI-Q
+](https://www.st.com/en/evaluation-tools/nucleo-u3c5zi-q.html). The current version of the application code only supports usage of the digital microphone on the first two boards, and usage of the [X-NUCLEO-IKS02A1](https://www.st.com/en/evaluation-tools/x-nucleo-iks02a1.html) expansion board on the latter.
 
 </details></ul>
 <ul><details open><summary><a href="#1-2">1.2 Software requirements</a></summary><a id="1-2"></a>
@@ -29,8 +33,9 @@ For local installation :
 </details></ul>
 <ul><details open><summary><a href="#1-3">1.3 Specifications</a></summary><a id="1-3"></a>
 
-- `serie` : STM32U5 or STM32N6
-- `board`: B-U585I-IOT02A or STM32N6570-DK
+- `serie` : STM32U5 or STM32N6 or STM32U3
+- `board` : B-U585I-IOT02A or STM32N6570-DK or NUCLEO-U3C5ZI-Q
+- `hsp` : 4096 if using NUCLEO-U3C5ZI-Q, None otherwise.
 - `IDE` : GCC
 - `quantization_input_type` : int8
 - `quantization_output_type` : float
@@ -242,15 +247,42 @@ deployment:
 
 ```
 
+For deployment on NUCLEO-U3C5ZI-Q : 
 
-There is one C application available for AED when deploying on STM32N6, found under [application_code/sensing/STM32U5/](../../application_code/sensing/STM32U5/README.md). This the same application code usable for deploying Human Activity Recognition models.
+```yaml
+tools:
+  stedgeai:
+    optimization: balanced
+    on_cloud: False
+    path_to_stedgeai: C:/ST/STEdgeAI/<x.y>/Utilities/windows/stedgeai.exe
+    hsp: 4096 # Set to None to disable HSP for the model. Only 4096 or None are supported for now.
+  path_to_cubeIDE: C:/ST/STM32CubeIDE_<*.*.*>/STM32CubeIDE/stm32cubeide.exe
+  
+deployment:
+  c_project_path: ../application_code/audio/STM32U3
+  IDE: GCC
+  verbosity: 1
+  hardware_setup:
+    serie: STM32U3
+    board: NUCLEO-U3C5ZI-Q
+  unknown_class_threshold: 0.0 # Threshold used for OOD detection. Mutually exclusive with use_garbage_class
+                               # Set to 0 to disable. To enable, set to any float between 0 and 1.
+  build_conf: Debug # Use "Debug" to enable HSP for preprocessing, and use "Debug_No_HSP" to disable HSP for preprocessing.
+```
+
+**NOTE : ** The C application on NUCLEO-U3C5ZI-Q uses the board's HSP feature. By default, this feature is used to accelerate both the model AND the preprocessing. You can change this behaviour by editing your config file. Setting `hsp` under `tools.stedgeai` to `None` disables HSP usage for the model, and setting `build_conf` to `Debug_No_HSP` disables HSP usage for the preprocessing.
+
+
+There is one C application available for AED when deploying on STM32U5, found under [application_code/sensing/STM32U5/](../../application_code/sensing/STM32U5/README.md). This the same application code usable for deploying Human Activity Recognition models.
 
 There is one C application available for AED when deploying on STM32N6, found under [application_code/audio/STM32N6/](../../application_code/audio/STM32N6/).
+
+Lastly, there is one C application available for AED when deploying on STM32U3, found under [application_code/audio/STM32U3/](../../application_code/audio/STM32U3/).
 
 **Make sure you choose the correct application code path for the board you want to deploy on**
 
 You only need to specify the path to one of these applications in `c_project_path`.
-Currently, the C application only supports the `B-U585I-IOT02A` and `STM32N6570-DK` board.
+Currently, the C application only supports the `B-U585I-IOT02A`,  `STM32N6570-DK` and `NUCLEO-U3C5ZI-Q`  boards.
 
 `unknown_class_threshold` is a parameter used for OOD (out of distribution) sample detection during runtime. It is mutually exclusive with `dataset.use_garbage_class`. For more details on how OOD detection is handled, please consult section <a href="#3"> 3. Out of distribution sample detection in the model zoo </a>, and section 6 of the [main README](./README_OVERVIEW.md).
 
@@ -318,7 +350,7 @@ Once flashed the board can be connected through a serial terminal and the output
 To connect the serial port please follow the steps shown in the figure below:
 ![plot](./img/tera_term_connection.png)
 
-**If deploying on STM32U5 using the application loacated in `application_code/audio/STM32U5/`, the expected baud rate is 115200**
+**If deploying on STM32U5 or STM32U3 using the application loacated in `application_code/audio/STM32U5/` or in  `application_code/audio/STM32U3/` , the expected baud rate is 115200**
 
 **If deploying on STM32N6 using the application loacated in `application_code/audio/STM32N6/`, the expected baud rate is 14400**
 
@@ -339,7 +371,7 @@ The labels `"signal"` shows the signal index or number, the `"class"` has the la
 </details>
 <details open><summary><a href="#6"><b>6. Restrictions</b></a></summary><a id="6"></a>
 
-- In this version, application code for deployment is only supported on the [B-U585I-IOT02A](https://www.st.com/en/evaluation-tools/steval-stwinkt1b.html), and [STM32N6570-DK](https://www.st.com/en/evaluation-tools/stm32n6570-dk.html) boards.
+- In this version, application code for deployment is only supported on the [B-U585I-IOT02A](https://www.st.com/en/evaluation-tools/steval-stwinkt1b.html), [STM32N6570-DK](https://www.st.com/en/evaluation-tools/stm32n6570-dk.html) and [NUCLEO-U3C5ZI-Q](https://www.st.com/en/evaluation-tools/nucleo-u3c5zi-q.html) boards.
 - Only the *int8* type input is supported for the quantization operation.
 
 </details>

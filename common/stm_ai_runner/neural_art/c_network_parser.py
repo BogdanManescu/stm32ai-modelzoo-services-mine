@@ -308,6 +308,8 @@ def parse_compiler_options(lines: Union[TextIO, List[str]],
         elif '--load-mpool-file' in line:
             file_path_ = _get_last_item(line).replace('\\', '::').replace('/', '::')
             mempool_ = file_path_.split('::')[-1]
+        elif '--network-name' in line:
+            c_name_ = _get_last_item(line)
         elif 'enable-epoch-controller' in line:
             ec_ = _get_last_item(line) == 'true'
         elif 'LL_ATON_VERSION_MAJOR' in line:
@@ -318,13 +320,17 @@ def parse_compiler_options(lines: Union[TextIO, List[str]],
         if "/* global pool " in line:
             break
 
-    p_reg = re.compile(r'const EpochBlock_ItemTypeDef \*LL_ATON_EpochBlockItems\_(?P<c_name>\w+)\(void\)*')
+    p_reg = re.compile(r'const LL_ATON_RT_EpochBlockItem_t \*LL_ATON_EpochBlockItems\_(?P<c_name>\w+)\(void\)*')
     for line in lines:
         line = line.strip()
         match = p_reg.match(line)
         if match:
             c_name_ = match.group('c_name')
             break
+
+    if c_name_ == '':
+        msg_ = 'Unable to retreive the c_name from the network.c file'
+        raise ParserNetworkError(msg_)
 
     options = CompilerDesc(desc_, sha_, date_,
                            csv_file_, all_buffers_info_, model_file_, json_quant_file_,
@@ -1187,7 +1193,7 @@ def parse_epoch_start_end_functions(lines: Union[TextIO, List[str]],
 
     logger.debug('-> Parsing the start/end epoch functions.. nblines=%s', len(lines))
 
-    reg0 = re.compile(r'static void LL_ATON_(?P<entry>Start|End)_EpochBlock_(?P<n0>\d+)\(const void \*epoch_block\)')
+    reg0 = re.compile(r'static void LL_ATON_(?P<entry>Start|End)_EpochBlock_(?P<n0>\d+)\(const LL_ATON_RT_EpochBlockItem_t \*epoch_block')
 
     # Extract lines with the start/end epoch functions
     line_descs: List[str] = []
@@ -1225,7 +1231,7 @@ def parse_epoch_start_end_functions(lines: Union[TextIO, List[str]],
 
 
 class EpochBlockDesc():
-    """Class to handle the descrition of an epoch (EpochBlock_ItemTypeDef)"""
+    """Class to handle the descrition of an epoch (LL_ATON_RT_EpochBlockItem_t)"""
 
     def __init__(self, c_idx: int = -1, desc: str = ''):
         self.idx: int = c_idx
@@ -1362,7 +1368,8 @@ def parse_epoch_block_list(lines: Union[TextIO, List[str]],
     line_descs: List[str] = []
     for line in lines:
         line = line.strip()
-        if 'static const EpochBlock_ItemTypeDef ll_atonn_rt_epoch_block_array' in line:
+        #   static const LL_ATON_RT_EpochBlockItem_t ll_atonn_rt_epoch_block_array
+        if 'static const LL_ATON_RT_EpochBlockItem_t ll_atonn_rt_epoch_block_array' in line:
             line_descs.append(line)
         elif line_descs and re.search(r'return\s+ll_atonn_rt_epoch_block_array', line):
             break

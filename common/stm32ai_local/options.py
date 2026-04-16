@@ -65,6 +65,7 @@ _COMPILE_OPTIONS_ = {
     'inputs_ch_position': ('', (str,), '--inputs-ch-position'),
     'outputs_ch_position': ('', (str,), '--outputs-ch-position'),
     'quiet': (True, (bool,), '--quiet'),
+    'hsp': ('', (int,), '--hsp'),
     'optimization': ('default', (str,), '-O'),
 }
 
@@ -88,6 +89,7 @@ class STMAiCompileOptions:
     name: str = 'network'
     quiet: bool = True  # since 7.2
     optimization: Union[str, None] = None  # since 7.3
+    hsp: int = None,
     _version: Union[str, STMAiVersion, None] = None
 
     def to_cli_args(self, vers: Union[str, STMAiVersion, None] = None):

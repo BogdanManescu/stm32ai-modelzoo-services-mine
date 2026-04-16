@@ -16,19 +16,19 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-sys.path.append(os.path.dirname(SCRIPT_DIR))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))))
+print(ROOT_DIR)
+sys.path.append(ROOT_DIR)
 
-from object_detection.tf.src.preprocessing import get_evaluation_data_loader
+from api import get_dataloaders
 from common.data_augmentation import random_color, random_misc, random_erasing
 from object_detection.tf.src.data_augmentation import objdet_random_affine, objdet_random_misc
 from object_detection.tf.src.utils import plot_bounding_boxes
 
 
-
-def plot_images_and_labels(image, labels, image_aug, labels_aug, grayscale=None, legend=None):
+def plot_images_and_labels(image, labels, image_aug, labels_aug, grayscale=None, legend=None, save_dir=None, filename=None):
     """
-    Displays side by side the original and augmented image
+    Displays or saves side by side the original and augmented image
     with their groundtruth bounding boxes.
 
     Arguments:
@@ -46,7 +46,9 @@ def plot_images_and_labels(image, labels, image_aug, labels_aug, grayscale=None,
             A numpy array with shape [num_labels, 5]
         class_names:
             A list of strings, the class names.
-            
+        save_dir (str): directory to save the figure. If None, plt.show() is used.
+        filename (str): filename to use when saving. Required if save_dir is not None.
+
     Returns:
         None
     """
@@ -62,7 +64,7 @@ def plot_images_and_labels(image, labels, image_aug, labels_aug, grayscale=None,
         x_size = round((image_height / image_width) * display_size)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(x_size, y_size))
-    
+
     # Sample box colors
     num_boxes = np.shape(labels)[0]
     colors = []
@@ -83,16 +85,27 @@ def plot_images_and_labels(image, labels, image_aug, labels_aug, grayscale=None,
     plot_bounding_boxes(ax2, labels_aug[:, 1:], colors=colors)
     ax2.title.set_text(legend)
 
-    plt.show()
-    plt.close()
-    
+    plt.tight_layout()
+
+    if save_dir is not None:
+        os.makedirs(save_dir, exist_ok=True)
+        if filename is None:
+            filename = "comparison.png"
+        out_path = os.path.join(save_dir, filename)
+        fig.savefig(out_path, dpi=150, bbox_inches="tight")
+        print(f"Saved: {out_path}")
+        plt.close(fig)
+    else:
+        plt.show()
+        plt.close(fig)
+
 
 def augment_images(images, labels, fn_name=None):
 
     if fn_name == "random_contrast":
         images_aug = random_color.random_contrast(images, factor=0.7)
         return images_aug, labels
-        
+
     elif fn_name == "random_brightness":
         images_aug = random_color.random_brightness(images, factor=0.4)
         return images_aug, labels
@@ -109,10 +122,10 @@ def augment_images(images, labels, fn_name=None):
         images_aug = random_color.random_saturation(images, delta=0.2)
         return images_aug, labels
 
-    elif fn_name == "random_value":           
-        images_aug = random_color.random_value(images, delta=0.2)        
-        return images_aug, labels 
-        
+    elif fn_name == "random_value":
+        images_aug = random_color.random_value(images, delta=0.2)
+        return images_aug, labels
+
     elif fn_name == "random_hsv":
         images_aug = random_color.random_hsv(
                         images, hue_delta=0.1, saturation_delta=0.2, value_delta=0.2)
@@ -122,7 +135,7 @@ def augment_images(images, labels, fn_name=None):
         images_aug = random_color.random_rgb_to_hsv(images, change_rate=1.0)
         return images_aug, labels
 
-    elif fn_name == "random_rgb_to_grayscale":        
+    elif fn_name == "random_rgb_to_grayscale":
         images_aug = random_color.random_rgb_to_grayscale(images, change_rate=1.0)
         return images_aug, labels
 
@@ -136,7 +149,7 @@ def augment_images(images, labels, fn_name=None):
 
     elif fn_name == "random_invert":
         images_aug = random_color.random_invert(images, change_rate=1.0)
-        return images_aug, labels 
+        return images_aug, labels
 
     elif fn_name == "random_solarize":
         images_aug = random_color.random_solarize(images, change_rate=1.0)
@@ -148,11 +161,11 @@ def augment_images(images, labels, fn_name=None):
 
     elif fn_name == "random_blur":
         images_aug = random_misc.random_blur(images, filter_size=(2, 4))
-        return images_aug, labels 
+        return images_aug, labels
 
     elif fn_name == "random_gaussian_noise":
         images_aug = random_misc.random_gaussian_noise(images, stddev=(0.02, 0.1))
-        return images_aug, labels 
+        return images_aug, labels
 
     elif fn_name == "random_crop":
         return objdet_random_misc.objdet_random_crop(images, labels, change_rate=1.0)
@@ -184,21 +197,21 @@ def augment_images(images, labels, fn_name=None):
     elif fn_name == "random_rectangle_erasing":
         images_aug = random_erasing.random_rectangle_erasing(images, nrec=(0, 3))
         return images_aug, labels
-        
 
-def demo_data_augmentation(dataset_path, grayscale=None, num_images=None):
+
+def demo_data_augmentation(dataset_path, dataset_name, grayscale=None, num_images=None, output_dir=None):
     """
-    Samples a batch of images with their groundtruth labels from 
+    Samples a batch of images with their groundtruth labels from
     the training set, applies to them the data augmentation functions
-    specified in the YAML configuration file, and displays side by side 
+    specified in the YAML configuration file, and displays or saves side by side
     the original images and augmented images with their groundtruth
     bounding boxes.
     """
-    
+
     # function_names = [
     #     "random_contrast", "random_brightness", "random_gamma", "random_hue",
     #     "random_saturation", "random_value", "random_hsv", "random_rgb_to_hsv",
-    #     "random_rgb_to_grayscale", "random_sharpness", "random_posterize", 
+    #     "random_rgb_to_grayscale", "random_sharpness", "random_posterize",
     #     "random_invert", "random_solarize", "random_autocontrast", "random_blur",
     #     "random_gaussian_noise", "random_crop", "random_flip", "random_translation",
     #     "random_rotation", "random_shear", "random_shear_x", "random_shear_y",
@@ -211,7 +224,7 @@ def demo_data_augmentation(dataset_path, grayscale=None, num_images=None):
         "random_hue", "random_saturation", "random_value", "random_hsv",
         "random_rgb_to_hsv", "random_rgb_to_grayscale", "random_autocontrast"
     ]
-    
+
     # If grayscale was requested, remove the functions
     # that are only applicable to color images from
     # the list of function names.
@@ -222,43 +235,69 @@ def demo_data_augmentation(dataset_path, grayscale=None, num_images=None):
     # Create a configuration dictionary with the
     # information needed to create the data loader
     cfg = DefaultMunch.fromDict({
+                "use_case" : "object_detection",
+                "model": { "model_path": None,
+                           "input_shape": (224, 224, 3),
+                           "framework": "tf" },
+                "operation_mode": "training",
                 "dataset": {
-                    "test_path": dataset_path,
-                    "seed": None
+                    "dataset_name": dataset_name,
+                    "format": "tfs",
+                    "train_images_path": dataset_path,
+                    "train_annotations_path": dataset_path,
+                    "class_names": ["person"],
+                    "seed": None,
+                    "max_detections": 20,
+                    "validation_split": 0.1
                 },
                 "preprocessing": {
                     "rescaling": { "scale": 1./255, "offset": 0  },
                     "resizing": { "interpolation": "bilinear", "aspect_ratio": "fit" },
                     "color_mode": "grayscale" if grayscale else "rgb",
+                },
+                "training": {
+                    "batch_size": 32
                 }
           })
-              
-    data_loader = get_evaluation_data_loader(
-                        cfg,
-                        image_size=(224, 224),
-                        batch_size=num_images,
-                        normalize=False, 
-                        verbose=False)
+    cfg.use_case = "object_detection"
+    cfg.model.framework = "tf"
+
+    # Create output directory if saving is enabled
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"Saving augmentation demo images to: {output_dir}")
+    else:
+        print("Display mode: Images will be shown (use ctrl+c to exit)")
+
+    data_loader = get_dataloaders(cfg)
 
     print("Demonstrating data augmentation functions:")
-    for fn in function_names:
+    for i, fn in enumerate(function_names):
         print("  " + fn)
-         
-    for i, data in enumerate(data_loader):
 
-        images, labels = data
-        batch_size = tf.shape(images)[0]
+        for data in data_loader['train']:
 
-        images_aug, labels_aug = augment_images(images, labels, fn_name=function_names[i])
+            images, labels = data
+            batch_size = tf.shape(images)[0]
 
-        # Plot the images and their groundtruth labels
-        for k in range(batch_size):
-            plot_images_and_labels(images[k], labels[k], images_aug[k], labels_aug[k], 
-                                   grayscale=grayscale, legend=function_names[i])
+            images_aug, labels_aug = augment_images(images, labels, fn_name=fn)
 
-        # Stop when all the data augmentation functions have been demo'ed
-        if i == len(function_names) - 1:
-            exit()
+            # Plot or save the images and their groundtruth labels
+            for k in range(batch_size):
+                if output_dir:
+                    # One folder per augmentation function
+                    fn_dir = os.path.join(output_dir, fn)
+                    filename = f"{fn}_img{k}.png"
+                    plot_images_and_labels(images[k], labels[k], images_aug[k], labels_aug[k],
+                                           grayscale=grayscale, legend=fn,
+                                           save_dir=fn_dir, filename=filename)
+                else:
+                    plot_images_and_labels(images[k], labels[k], images_aug[k], labels_aug[k],
+                                           grayscale=grayscale, legend=fn)
+
+            # Stop when all the data augmentation functions have been demo'ed
+            if i == len(function_names) - 1:
+                exit()
 
 
 def main():
@@ -266,17 +305,21 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', type=str, default='', required=True,
                         help='path to the dataset to sample')
+    parser.add_argument('--dataset_name', type=str, default='', required=True,
+                        help='Name of the dataset to sample')
     parser.add_argument('--grayscale', action='store_true',
                         help='demo data augmentation functions on grayscale images')
     parser.add_argument('--num_images', type=int, default=4,
                         help='number of images to display for each data augmentation function (default: 4)')
-    
+    parser.add_argument('--output_dir', type=str, default=None,
+                        help='Directory to save the augmentation demo images. If not provided, images will be displayed.')
+
     args = parser.parse_args()
 
     if not os.path.isdir(args.dataset_path):
         raise ValueError(f"\nCould not find dataset directory: {args.dataset_path}")
-    
-    demo_data_augmentation(args.dataset_path, grayscale=args.grayscale, num_images=args.num_images)
+
+    demo_data_augmentation(args.dataset_path, args.dataset_name, grayscale=args.grayscale, num_images=args.num_images, output_dir=args.output_dir)
 
 if __name__ == '__main__':
     main()

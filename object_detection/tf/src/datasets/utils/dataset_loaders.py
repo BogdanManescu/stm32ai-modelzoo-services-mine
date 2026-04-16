@@ -224,53 +224,32 @@ def download_dataset(data_root: str, dataset_name: str) -> str:
     else:
         raise TypeError("The chosen dataset is not supported for detection. Choose one of: ['coco', 'coco person', 'pascal_voc']")
 
-
-def _get_sample_paths(dataset_root: str = None, shuffle: bool = True, seed: int = None) -> list:
+def _get_sample_paths(images_root: str = None,
+                      tfs_root: str = None,
+                      shuffle: bool = True,
+                      seed: int = None) -> list:
     """
     Gets all the paths to .jpg image files and corresponding .tfs labels
-    files under a dataset root directory.
+    files under separate directories.
 
-    Image and label file paths are grouped in pairs as follows:
+    Returns a list of:
         [
-           [dataset_root/basename_1.jpg, dataset_root/basename_1.tfs],
-           [dataset_root/basename_2.jpg, dataset_root/basename_2.tfs],
+            [images_root/basename_1.jpg, tfs_root/basename_1.tfs],
+            [images_root/basename_2.jpg, tfs_root/basename_2.tfs],
             ...
         ]
-    If the .tfs file that corresponds to a given .jpg file is missing,
-    the .jpg file is ignored.
 
-    If the function is called with the `shuffle` argument set to True
-    and without the `seed` argument, or with the `seed` argument set
-    to None, the file paths are shuffled but results are not reproducible.
-
-    if the `shuffle` argument is set to False, paths are sorted
-    in alphabetical order.
-
-    Arguments:
-        dataset_root:
-            A string, the path to the directory that contains the image
-            and labels files.
-        shuffle:
-            A boolean, specifies whether paths should be shuffled or not.
-            Defaults to True.
-        seed:
-            An integer, the seed to use to make paths shuffling reproducible.
-            Used only when `shuffle` is set to True.
-
-    Returns:
-        A list of [<image-file-path>, <labels-file-path>] pairs.
+    If the corresponding .tfs file is missing, the .jpg is ignored.
     """
 
-    if not os.path.isdir(dataset_root):
-        raise ValueError(f"Unable to find dataset directory {dataset_root}")
+    if not os.path.isdir(images_root):
+        raise ValueError(f"Unable to find images directory {images_root}")
+    if not os.path.isdir(tfs_root):
+        raise ValueError(f"Unable to find tfs directory {tfs_root}")
 
-    jpg_file_paths = glob.glob(os.path.join(Path(dataset_root), "*.jpg"))
+    jpg_file_paths = glob.glob(os.path.join(Path(images_root), "*.jpg"))
     if not jpg_file_paths:
-        raise ValueError(f"Could not find any .jpg image files in directory {dataset_root}")
-
-    tfs_file_paths = glob.glob(os.path.join(Path(dataset_root), "*.tfs"))
-    if not tfs_file_paths:
-        raise ValueError(f"Could not find any .tfs labels files in directory {dataset_root}")
+        raise ValueError(f"Could not find any .jpg image files in directory {images_root}")
 
     if shuffle:
         random.seed(seed)
@@ -280,7 +259,7 @@ def _get_sample_paths(dataset_root: str = None, shuffle: bool = True, seed: int 
 
     samples_paths = []
     for jpg_path in jpg_file_paths:
-        tfs_path = os.path.join(dataset_root, Path(jpg_path).stem + ".tfs")
+        tfs_path = os.path.join(tfs_root, Path(jpg_path).stem + ".tfs")
         if os.path.isfile(tfs_path):
             samples_paths.append([jpg_path, tfs_path])
 
@@ -633,23 +612,6 @@ def _create_image_loader(
     ds = ds.batch(batch_size)
     return ds
 
-
-def _find_jpg_tfs_pairs(directory):
-    jpg_files = glob.glob(os.path.join(directory, '*.jpg'))
-    pairs = []
-    for jpg in jpg_files:
-        base = os.path.splitext(os.path.basename(jpg))[0]
-        tfs = os.path.join(directory, base + '.tfs')
-        if os.path.isfile(tfs):
-            pairs.append((jpg, tfs))
-    return pairs
-
-def _move_files(file_pairs, dest_dir):
-    os.makedirs(dest_dir, exist_ok=True)
-    for jpg, tfs in file_pairs:
-        shutil.move(jpg, os.path.join(dest_dir, os.path.basename(jpg)))
-        shutil.move(tfs, os.path.join(dest_dir, os.path.basename(tfs)))
-
 def get_training_dataloader(
                 cfg: DictConfig,
                 image_size: tuple = None,
@@ -660,53 +622,14 @@ def get_training_dataloader(
                 seed: int = None,
                 verbose: bool = True) -> tf.data.Dataset:
 
-    training_path = cfg.dataset.training_path
-    data_dir = getattr(cfg.dataset, 'data_dir', None)
-    validation_path = getattr(cfg.dataset, 'validation_path', None)
-    validation_split = cfg.dataset.validation_split
+    cds = cfg.dataset
 
-    # Check if training_path contains jpg/tfs pairs
-    train_pairs = _find_jpg_tfs_pairs(training_path)
-
-    if len(train_pairs) == 0:
-        # If no pairs in training_path, check data_dir
-        if data_dir is None:
-            raise RuntimeError(f"No jpg/tfs pairs found in training_path '{training_path}' and no data_dir defined.")
-
-        data_dir_pairs = _find_jpg_tfs_pairs(data_dir)
-
-        if len(data_dir_pairs) == 0:
-            raise RuntimeError(f"No jpg/tfs pairs found in both training_path '{training_path}' and data_dir '{data_dir}'.")
-
-        # Split pairs into train and val
-        import random
-        if seed is not None:
-            random.seed(seed)
-        random.shuffle(data_dir_pairs)
-
-        split_index = int(len(data_dir_pairs) * (1 - validation_split))
-        train_split_pairs = data_dir_pairs[:split_index]
-        val_split_pairs = data_dir_pairs[split_index:]
-
-        # Move train files to training_path
-        _move_files(train_split_pairs, training_path)
-
-        # Determine validation_path if not defined
-        if validation_path is None:
-            parent_dir = os.path.dirname(training_path.rstrip('/\\'))
-            validation_path = os.path.join(parent_dir, 'val')
-            cfg.dataset.validation_path = validation_path  # Update config dynamically if needed
-
-        # Move val files to validation_path
-        _move_files(val_split_pairs, validation_path)
-
-        if verbose:
-            print(f"Moved {len(train_split_pairs)} jpg/tfs pairs to training_path: {training_path}")
-            print(f"Moved {len(val_split_pairs)} jpg/tfs pairs to validation_path: {validation_path}")
+    if seed is None:
+        seed = cds.seed
 
     if not image_size:
-        val_image_size = cfg.model.input_shape[:2]
         train_image_size = cfg.model.input_shape[:2]
+        val_image_size = cfg.model.input_shape[:2]
     else:
         train_image_size = image_size
         val_image_size = image_size
@@ -721,27 +644,46 @@ def get_training_dataloader(
     if not val_batch_size:
         val_batch_size = cfg.training.batch_size
 
-    cds = cfg.dataset
-    if not seed:
-        seed = cds.seed
+    validation_split = getattr(cds, "validation_split", 0.2)
 
-    train_example_paths = _get_sample_paths(cds.training_path, seed=seed)
+    train_images_dir = cds.train_images_path
+    train_tfs_dir = cds.training_path
+    if cds.format == "tfs":
+         train_tfs_dir = cds.train_annotations_path
 
-    if cds.validation_path:
-        val_example_paths = _get_sample_paths(cds.validation_path, seed=seed)
+    if not os.path.isdir(train_images_dir):
+        raise RuntimeError(f"train_images_path '{train_images_dir}' does not exist or is not a directory.")
+    if not os.path.isdir(train_tfs_dir):
+        raise RuntimeError(f"training_path '{train_tfs_dir}' does not exist or is not a directory.")
+
+    train_example_paths = _get_sample_paths(train_images_dir, train_tfs_dir, shuffle=True, seed=seed)
+
+    has_explicit_val = (
+        getattr(cds, "val_images_path", None) and
+        getattr(cds, "validation_path", None) and
+        os.path.isdir(cds.val_images_path) and
+        os.path.isdir(cds.validation_path)
+    )
+
+    if has_explicit_val:
+        val_example_paths = _get_sample_paths(cds.val_images_path, cds.validation_path, shuffle=True, seed=seed)
     else:
         train_example_paths, val_example_paths = _split_file_paths(
-            train_example_paths, split_ratio=cds.validation_split)
+            train_example_paths,
+            split_ratio=validation_split
+        )
 
     if verbose:
         print("Training set:")
-        print(" path:", cds.training_path)
+        print(" images path:", train_images_dir)
+        print(" tfs path:", train_tfs_dir)
         print(" size:", len(train_example_paths))
         print("Validation set:")
-        if cds.validation_path:
-            print(" path:", cds.validation_path)
+        if has_explicit_val:
+            print(" images path:", cds.val_images_path)
+            print(" tfs path:", cds.validation_path)
         else:
-            print(" created using {:.1f}% of the training data {}".format(100 * cds.validation_split, cds.training_path))
+            print(" created using {:.1f}% of the training data".format(100 * validation_split))
         print(" size:", len(val_example_paths))
 
     cpp = cfg.preprocessing
@@ -779,87 +721,44 @@ def get_evaluation_dataloader(
                     normalize: bool = None,
                     clip_boxes: bool = True,
                     seed: int = None,
-                    verbose: bool =True) -> tf.data.Dataset:
-
-    """
-    Creates a data loader for evaluating a model.
-
-    The evaluation dataset is chosen in the following precedence order:
-      1. test set
-      2. validation set
-      3. validation set created by splitting the training set
-
-    Arguments:
-        cfg:
-            A dictionary, the entire configuration file dictionary.
-        image_size:
-            A tuple of 2 integers: (width, height).
-            Specifies the size of the images supplied by
-            the data loaders.
-        batch_size:
-            An integer, the size of data batches supplied
-            by the data loader.
-            Defaults to 64.
-        normalize:
-            A boolean. If True, the coordinates values of the bounding
-            boxes supplied by the generators are normalized. If False,
-            they are absolute.
-            Defaults to True.
-        clip_boxes:
-            A boolean. If True, the coordinates of the bounding boxes
-            supplied by the generators are clipped to [0, 1] if they are
-            normalized and to the image dimensions if they are absolute.
-            If False, they are left as is.
-            Defaults to True.
-        seed:
-            An integer, the seed to use to make file paths shuffling and
-            training set splitting reproducible.
-            Defaults to cfg.dataset.seed
-        verbose:
-            A boolean. If True, the dataset path and size are displayed.
-            If False, no message is displayed.
-            Default to True.
-
-    Returns:
-        A tf.data.Dataset data loader
-    """
+                    verbose: bool = True) -> tf.data.Dataset:
 
     cds = cfg.dataset
-    if not seed:
+    if seed is None:
         seed = cds.seed
+    if not image_size:
+        image_size = cfg.model.input_shape[:2]
 
-    if cds.test_path:
-        example_paths = _get_sample_paths(cds.test_path, seed=seed)
-    elif cds.validation_path:
-        example_paths = _get_sample_paths(cds.validation_path, seed=seed)
-    else:
-        train_example_paths = _get_sample_paths(cds.training_path, seed=seed)
-        _, example_paths = _split_file_paths(train_example_paths, split_ratio=cds.validation_split)
+    test_images_dir = getattr(cds, "test_images_path", None)
+    test_tfs_dir = cds.test_path
+    if cds.format == "tfs":
+         test_tfs_dir = cds.test_annotations_path
 
+    if not test_images_dir or not os.path.isdir(test_images_dir):
+        raise RuntimeError(f"test_images_path '{test_images_dir}' does not exist or is not a directory.")
+
+    if not test_tfs_dir or not os.path.isdir(test_tfs_dir):
+        raise RuntimeError(f"test_path '{test_tfs_dir}' does not exist or is not a directory.")
+
+    example_paths = _get_sample_paths(test_images_dir, test_tfs_dir, shuffle=True, seed=seed)
 
     if verbose:
         print("Evaluation dataset:")
-        if cds.test_path:
-            print(" path:", cds.test_path)
-        elif cds.validation_path:
-            print(" path:", cds.validation_path)
-        else:
-            print(" created using {:.1f}% of training data {}".
-                       format(100*cds.validation_split, cds.training_path))
+        print(" images path:", test_images_dir)
+        print(" tfs path:", test_tfs_dir)
         print(" size:", len(example_paths))
 
     cpp = cfg.preprocessing
-    
     test_ds = _create_image_and_labels_loader(
-                    example_paths,
-                    image_size=image_size,
-                    batch_size=val_batch_size,
-                    rescaling=(cpp.rescaling.scale, cpp.rescaling.offset),
-                    interpolation=cpp.resizing.interpolation,
-                    aspect_ratio=cpp.resizing.aspect_ratio,
-                    color_mode=cpp.color_mode,
-                    normalize=normalize,
-                    clip_boxes=clip_boxes)
+        example_paths,
+        image_size=image_size,
+        batch_size=val_batch_size,
+        rescaling=(cpp.rescaling.scale, cpp.rescaling.offset),
+        interpolation=cpp.resizing.interpolation,
+        aspect_ratio=cpp.resizing.aspect_ratio,
+        color_mode=cpp.color_mode,
+        normalize=normalize,
+        clip_boxes=clip_boxes)
 
     return test_ds
 

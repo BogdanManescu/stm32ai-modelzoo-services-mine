@@ -8,18 +8,15 @@
 #  *--------------------------------------------------------------------------------------------*/
 
 import os
-import warnings
-import numpy as np
 import tqdm
-import mlflow
 import tensorflow as tf
+import mlflow
 import matplotlib.pyplot as plt
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
 from timeit import default_timer as timer
 from datetime import timedelta
 from tabulate import tabulate
-from pathlib import Path
 
 from object_detection.tf.src.postprocessing import get_detections
 from object_detection.tf.src.utils import ObjectDetectionMetricsData, calculate_objdet_metrics, calculate_average_metrics

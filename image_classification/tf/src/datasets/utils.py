@@ -42,7 +42,7 @@ def _get_path_dataset(path: str,
         shuffle (bool): Initial shuffling (or not) of input files names.
 
     Returns:
-        dataset(tf.data.Dataset) -> dataset with a tuple (path, label) of each sample. 
+        dataset(tf.data.Dataset) -> dataset with a tuple (path, label) of each sample.
     """
 
     data_list = []
@@ -69,7 +69,7 @@ def _get_path_dataset(path: str,
     if shuffle:
         rng = np.random.RandomState(seed)
         rng.shuffle(data_list)
-    
+
     imgs, labels = zip(*data_list)
     dataset = tf.data.Dataset.from_tensor_slices((list(imgs), list(labels)))
 
@@ -87,7 +87,7 @@ def _preprocess_function(data_x : tf.Tensor,
     """
     Load images from path and apply necessary transformations.
 
-    Args: 
+    Args:
         data_x (tf.Tensor): input image
         data_y (tf.Tensor): input label
         image_size (tuple[int]): Size of the input images to resize them to.
@@ -120,7 +120,7 @@ def _preprocess_function(data_x : tf.Tensor,
 
     if label_mode == "categorical":
         data_y = tf.keras.utils.to_categorical(data_y, num_classes)
-        
+
     return image, data_y
 
 
@@ -132,11 +132,11 @@ def _preprocess_prediction_function(data_x : tf.Tensor,
                                     color_mode: str,
                                     label_mode: str,
                                     num_classes: int) -> tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
-    
+
     """
     Load images from path and apply necessary transformations.
 
-    Args: 
+    Args:
         data_x (tf.Tensor): input image
         data_y (tf.Tensor): input label
         image_size (tuple[int]): Size of the input images to resize them to.
@@ -169,7 +169,7 @@ def _preprocess_prediction_function(data_x : tf.Tensor,
 
     if label_mode == "categorical":
         data_y = tf.keras.utils.to_categorical(data_y, num_classes)
-    
+
     return image, data_x
 
 
@@ -187,7 +187,7 @@ def get_train_val_ds(training_path: str,
                      to_cache: bool = False
                      ) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
     """
-    Loads the images under a given dataset root directory and returns training 
+    Loads the images under a given dataset root directory and returns training
     and validation tf.Data.datasets.
     The dataset has the following directory structure (checked in parse_config.py):
         dataset_root_dir:
@@ -228,7 +228,7 @@ def get_train_val_ds(training_path: str,
     validation_split = validation_split if validation_split else 0.2
     batch_size = batch_size if batch_size else 32
 
-    preprocess_params = (image_size, 
+    preprocess_params = (image_size,
                          interpolation,
                          aspect_ratio,
                          color_mode,
@@ -243,17 +243,17 @@ def get_train_val_ds(training_path: str,
 
     if shuffle:
         train_ds = train_ds.shuffle(len(train_ds), reshuffle_each_iteration=True, seed=seed)
-    
+
     train_ds = train_ds.map(lambda *data : _preprocess_function(*data,*preprocess_params))
     val_ds = val_ds.map(lambda *data : _preprocess_function(*data,*preprocess_params))
-    
+
     train_ds = train_ds.batch(batch_size)
     val_ds = val_ds.batch(batch_size)
 
     if to_cache:
         train_ds = train_ds.cache()
         val_ds = val_ds.cache()
-    
+
     train_ds = train_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
     val_ds = val_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
 
@@ -310,24 +310,24 @@ def get_ds(data_path: str = None,
     color_mode = color_mode if color_mode else "rgb"
     batch_size = batch_size if batch_size else 32
 
-    preprocess_params = (image_size, 
+    preprocess_params = (image_size,
                          interpolation,
                          aspect_ratio,
                          color_mode,
                          label_mode,
                          len(class_names))
-    
+
     dataset = _get_path_dataset(data_path, class_names, seed=seed)
 
     if shuffle:
         dataset = dataset.shuffle(len(dataset), reshuffle_each_iteration=True, seed=seed)
-    
+
     dataset = dataset.map(lambda *data: _preprocess_function(*data, *preprocess_params))
     dataset = dataset.batch(batch_size)
 
     if to_cache:
         dataset = dataset.cache()
-    
+
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
 
     return dataset
@@ -383,40 +383,40 @@ def get_prediction_ds(data_path: str = None,
     color_mode = color_mode if color_mode else "rgb"
     batch_size = batch_size if batch_size else 1
 
-    preprocess_params = (image_size, 
+    preprocess_params = (image_size,
                          interpolation,
                          aspect_ratio,
                          color_mode,
                          label_mode,
                          len(class_names))
-    
+
     dataset = _get_path_dataset(data_path, class_names, seed=seed)
 
     if shuffle:
         dataset = dataset.shuffle(len(dataset), reshuffle_each_iteration=True, seed=seed)
-    
+
     dataset = dataset.map(lambda *data: _preprocess_prediction_function(*data, *preprocess_params))
     dataset = dataset.batch(batch_size)
 
     if to_cache:
         dataset = dataset.cache()
-    
+
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
 
     return dataset
 
 
 def preprocess_data(dataloaders: dict = None,
-                    scale: float = None, 
+                    scale: float = None,
                     offset: float = None,
-                    mean: tuple[float] = None, 
+                    mean: tuple[float] = None,
                     std: tuple[float] = None
                     ) -> Tuple[tf.data.Dataset, tf.data.Dataset, tf.data.Dataset, tf.data.Dataset, tf.data.Dataset]:
 
     """
     Load images using dataloaders and apply rescaling/normalization.
 
-    Args: 
+    Args:
         dataloaders (dict): dictionnary of tf.data.Dataset
         scale (float): simple scaling of images pixels
         offset (float): simple offsetting of images pixels
@@ -460,7 +460,7 @@ def preprocess_data(dataloaders: dict = None,
                                mean=mean,
                                std=std)
 
-    return {'train': train_ds, 'valid': val_ds, 'quantization': quantization_ds, 'test': test_ds, 'predict': predict_ds}    
+    return {'train': train_ds, 'valid': val_ds, 'quantization': quantization_ds, 'test': test_ds, 'predict': predict_ds}
 
 
 def load_cifar_batch(fpath, label_key="labels") -> Tuple:
@@ -493,12 +493,13 @@ def load_cifar_batch(fpath, label_key="labels") -> Tuple:
     return data, labels
 
 
+
 def prepare_kwargs_for_dataloader(cfg: DictConfig):
 
     """
     Extract image size from the model and prepare dataloader args
 
-    Args: 
+    Args:
         cfg (dict): dictionnary of parameters
 
     Returns:
@@ -506,30 +507,39 @@ def prepare_kwargs_for_dataloader(cfg: DictConfig):
 
     """
     model_path = cfg.model.model_path
-    file_extension = str(model_path).split('.')[-1]
     model_tmp = None
     input_shape = None
-    input_shape = cfg.model.input_shape
-    if file_extension in ['h5', 'keras']:
-        model_tmp = tf.keras.models.load_model(model_path, compile=False)
-        input_shape = model_tmp.inputs[0].shape[1:]
-        image_size = tuple(input_shape)[:-1]
-    elif file_extension == 'tflite':
-        model_tmp = tf.lite.Interpreter(model_path=model_path)
-        model_tmp.allocate_tensors()
-        # Get the input details
-        input_details = model_tmp.get_input_details()
-        input_shape = tuple(input_details[0]['shape'])
-        image_size = tuple(input_shape)[-3:-1]
-    elif file_extension == 'onnx':
-        model_tmp = onnxruntime.InferenceSession(model_path)
-        # Get the model input shape
-        input_shape = model_tmp.get_inputs()[0].shape
-        input_shape = tuple(input_shape)[-3:]
-        image_size = tuple(input_shape)[1:]
+    image_size = None
+
+    if model_path is not None:
+        file_extension = str(model_path).split('.')[-1]
+        input_shape = cfg.model.input_shape
+        if file_extension in ['h5', 'keras']:
+            model_tmp = tf.keras.models.load_model(model_path, compile=False)
+            input_shape = model_tmp.inputs[0].shape[1:]
+            image_size = tuple(input_shape)[:-1]
+        elif file_extension == 'tflite':
+            model_tmp = tf.lite.Interpreter(model_path=model_path)
+            model_tmp.allocate_tensors()
+            # Get the input details
+            input_details = model_tmp.get_input_details()
+            input_shape = tuple(input_details[0]['shape'])
+            image_size = tuple(input_shape)[-3:-1]
+        elif file_extension == 'onnx':
+            model_tmp = onnxruntime.InferenceSession(model_path)
+            # Get the model input shape
+            input_shape = model_tmp.get_inputs()[0].shape
+            input_shape = tuple(input_shape)[-3:]
+            image_size = tuple(input_shape)[1:]
+    else:
+        # If no model path is provided, use the input_shape from config
+        input_shape = cfg.model.input_shape
+        if input_shape is not None:
+            image_size = tuple(input_shape)[:-1]
+
     print("input_shape=", input_shape)
     print("image_size=", image_size)
-    
+
     # Prepare kwargs
     batch_size = getattr(cfg.training, 'batch_size', 32) if cfg.training else 32
     dataloader_kwargs = {
@@ -542,15 +552,15 @@ def prepare_kwargs_for_dataloader(cfg: DictConfig):
         'quantization_split': getattr(cfg.dataset, 'quantization_split', None),
         'class_names': getattr(cfg.dataset, 'class_names', None),
         'image_size': image_size,
-        'interpolation': getattr(cfg.preprocessing.resizing, 'interpolation', None), 
-        'aspect_ratio': getattr(cfg.preprocessing.resizing, 'aspect_ratio', None), 
-        'color_mode': getattr(cfg.preprocessing, 'color_mode', None), 
-        'batch_size': batch_size, 
+        'interpolation': getattr(cfg.preprocessing.resizing, 'interpolation', None),
+        'aspect_ratio': getattr(cfg.preprocessing.resizing, 'aspect_ratio', None),
+        'color_mode': getattr(cfg.preprocessing, 'color_mode', None),
+        'batch_size': batch_size,
         'seed': getattr(cfg.dataset, 'seed', 127),
-        'rescaling_scale': getattr(cfg.preprocessing.rescaling, 'scale', 1.0/255.0), 
-        'rescaling_offset': getattr(cfg.preprocessing.rescaling, 'offset', 0), 
-        'normalization_mean': getattr(cfg.preprocessing.normalization, 'mean', 0.0), 
-        'normalization_std': getattr(cfg.preprocessing.normalization, 'std', 1.0), 
+        'rescaling_scale': getattr(cfg.preprocessing.rescaling, 'scale', 1.0/255.0),
+        'rescaling_offset': getattr(cfg.preprocessing.rescaling, 'offset', 0),
+        'normalization_mean': getattr(cfg.preprocessing.normalization, 'mean', 0.0),
+        'normalization_std': getattr(cfg.preprocessing.normalization, 'std', 1.0),
         'data_dir':  getattr(cfg.dataset, 'data_dir', './datasets/'),
         'data_download': getattr(cfg.dataset, 'data_download', True),
     }
@@ -562,7 +572,7 @@ def _copy_food_101_images(images_dir:str,
                  dest_root:str):
     """
     Copy images listed in the file_list_path from images_dir to dest_root preserving directory structure.
-    
+
     Args:
         images_dir (str): source images directory.
         file_list_path (str): path to the file containing list of images to copy.
@@ -581,7 +591,7 @@ def _copy_food_101_images(images_dir:str,
 def _split_food101(data_root:str='./datasets/'):
     """
     Splits the food-101 dataset into train and test folders based on the meta/train.txt and meta/test.txt files.
-    
+
     Args:
         data_root (str): root directory where the food-101 dataset is located.
 
@@ -599,12 +609,12 @@ def _split_food101(data_root:str='./datasets/'):
         os.makedirs(train_dir, exist_ok=True)
         os.makedirs(test_dir, exist_ok=True)
         print("[INFO] : Copying training images...")
-        _copy_food_101_images(images_dir=image_dir, 
-                     file_list_path=train_paths, 
+        _copy_food_101_images(images_dir=image_dir,
+                     file_list_path=train_paths,
                      dest_root=train_dir)
         print("[INFO] : Copying test images...")
-        _copy_food_101_images(images_dir=image_dir, 
-                     file_list_path=test_paths, 
+        _copy_food_101_images(images_dir=image_dir,
+                     file_list_path=test_paths,
                      dest_root=test_dir)
 
 def _check_dataset_already_exists(data_root:str='./datasets/',
@@ -622,27 +632,27 @@ def _check_dataset_already_exists(data_root:str='./datasets/',
         data_folder = os.path.join(data_root, 'cifar-10-batches-py')
         files = ["batches.meta", "data_batch_1", "data_batch_2", "data_batch_3", "data_batch_4", "data_batch_5", "readme.html", "test_batch"]
         _exists =  all(os.path.exists(os.path.join(data_folder, f)) for f in files)
-    
+
     elif dataset_name == 'cifar100':
         data_folder = os.path.join(data_root, 'cifar-100-python')
         files = ["meta", "test", "train"]
         _exists = all(os.path.exists(os.path.join(data_folder, f)) for f in files)
-    
+
     elif dataset_name == 'tf_flowers':
         _exists =  os.path.exists(os.path.join(data_root, 'flower_photos'))
-    
-    elif dataset_name == 'plant_leaf_diseases':        
+
+    elif dataset_name == 'plant_leaf_diseases':
         _exists = os.path.exists(os.path.join(data_root, 'Plant_leave_diseases_dataset_without_augmentation'))
-    
-    elif dataset_name == 'food101':        
+
+    elif dataset_name == 'food101':
         images_dir = os.path.join(data_root, 'food-101', 'images')
         meta_dir = os.path.join(data_root, 'food-101', 'meta')
         _exists = all(os.path.exists(folder) and os.path.isdir(folder) for folder in [images_dir, meta_dir])
-    
+
     elif dataset_name == 'emnist_byclass':
         data_folder = os.path.join(data_root, 'emnist_dataset')
         _exists =  os.path.exists(os.path.join(data_folder, "emnist-byclass.mat"))
-    
+
     if not _exists and not data_download:
         raise KeyError(f"[ERROR] : The dataset \"{dataset_name}\" was not found in \"{data_root}\" and \"data.data_download\" is set to False. Please set \"data.data_download\" to True to automatically the download the dataset or provide a valid path.")
     if _exists:
@@ -652,10 +662,10 @@ def _check_dataset_already_exists(data_root:str='./datasets/',
 def download_dataset(data_root:str,
                      dataset_name: str,
                      data_download: bool) -> str:
-    """ 
-    This function downloads and extracts the specified dataset in the specified root directory. 
+    """
+    This function downloads and extracts the specified dataset in the specified root directory.
     If the dataset is already present, it does not download it again and simply returns the path to the dataset.
-    
+
     Args:
         data_root (str): Directory where to download the dataset.
         dataset_name (str): name of the dataset to be downloaded. Supported datasets are:
@@ -678,26 +688,26 @@ def download_dataset(data_root:str,
                                      download_root=data_root,
                                      md5='c58f30108f718f92721af3b95e74349a')
         return os.path.join(data_root, 'cifar-10-batches-py')
-    
+
     elif dataset_name == 'cifar100':
         if _check_dataset_already_exists(data_root=data_root,
                                          dataset_name=dataset_name,
                                          data_download=data_download):
             print('data files found! Using existing files!')
             return os.path.join(data_root, 'cifar-100-python')
-        
+
         print(f'[INFO] : Files not found!\nDownloading {dataset_name} dataset in {data_root}')
         download_and_extract_archive(url='https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz',
                                      download_root=data_root,
                                      md5='eb9058c3a382ffc7106e4002c42a8d85')
         return os.path.join(data_root, 'cifar-100-python')
-    
+
     elif dataset_name == 'tf_flowers':
         if _check_dataset_already_exists(data_root=data_root,
                                          dataset_name=dataset_name,
                                          data_download=data_download):
             return os.path.join(data_root, 'flower_photos')
-        
+
         print(f'[INFO] : Files not found!\nDownloading {dataset_name} dataset in {data_root}')
         download_and_extract_archive(url='https://storage.googleapis.com/download.tensorflow.org/example_images/flower_photos.tgz',
                                  download_root=data_root,
@@ -723,20 +733,20 @@ def download_dataset(data_root:str,
                                          dataset_name=dataset_name,
                                          data_download=data_download):
             return os.path.join(data_root, 'Plant_leave_diseases_dataset_without_augmentation')
-        
+
         print(f'[INFO] : Files not found!\nDownloading {dataset_name} dataset in {data_root}')
         download_and_extract_archive(url='https://prod-dcd-datasets-public-files-eu-west-1.s3.eu-west-1.amazonaws.com/d29ed9b2-8a5d-4663-8a82-c9174f2c7066',
                                      download_root=data_root,
                                      md5='14ae99240aa7e7ba737bb94bd2bc87e3',
                                      filename='Plant_leave_diseases_dataset_without_augmentation.zip')
         return os.path.join(data_root, 'Plant_leave_diseases_dataset_without_augmentation')
-    
+
     elif dataset_name == 'emnist_byclass':
         if _check_dataset_already_exists(data_root=data_root,
                                          dataset_name=dataset_name,
                                          data_download=data_download):
             return os.path.join(data_root, 'emnist_dataset')
-        
+
         print(f'[INFO] : Files not found!\nDownloading {dataset_name} dataset in {data_root}')
         download_and_extract_archive(url='https://biometrics.nist.gov/cs_links/EMNIST/matlab.zip',
                                      download_root=data_root,

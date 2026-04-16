@@ -27,7 +27,8 @@ _FILE_DOMAIN = 'file'
 _APP_DOMAIN = 'app'
 _LIB_DOMAIN = 'lib'
 _SOCKET_DOMAIN = 'socket'
-_ISPU_APP_DOMAIN = 'ispu-app'
+_ISPU_STREDSIM_APP_DOMAIN = 'ispu-stredsim-app'
+_ISPU_XSTSIM_APP_DOMAIN = 'ispu-xstsim-app'
 _ISPU_TARGET_DOMAIN = 'serial-ispu'
 _MPU_TARGET_DOMAIN = 'mpu'
 _FVP_DOMAIN = 'fvp'
@@ -105,18 +106,32 @@ def _socket_create(parent, desc):
     return AiPbMsg(parent, SocketHwDriver()), desc
 
 
-def _ispu_app_resolver(domain, desc):
-    """ispu app resolver function"""  # noqa: DAR101,DAR201,DAR401
-    if domain == _ISPU_APP_DOMAIN and desc is not None:
-        from .ispu_app_drv import IspuAppDriver
-        return IspuAppDriver.is_valid(desc)
+def _ispu_stredsim_app_resolver(domain, desc):
+    """ispu stredsim app resolver function"""  # noqa: DAR101,DAR201,DAR401
+    if domain == _ISPU_STREDSIM_APP_DOMAIN and desc is not None:
+        from .ispu_stredsim_app_drv import IspuStredsimAppDriver
+        return IspuStredsimAppDriver.is_valid(desc)
     return False
 
 
-def _ispu_app_create(parent, desc):
-    """ispu app create function"""  # noqa: DAR101,DAR201,DAR401
-    from .ispu_app_drv import IspuAppDriver
-    return IspuAppDriver(parent), desc
+def _ispu_stredsim_app_create(parent, desc):
+    """ispu stredsim app create function"""  # noqa: DAR101,DAR201,DAR401
+    from .ispu_stredsim_app_drv import IspuStredsimAppDriver
+    return IspuStredsimAppDriver(parent), desc
+
+
+def _ispu_xstsim_app_resolver(domain, desc):
+    """ispu xstsim app (legacy) resolver function"""  # noqa: DAR101,DAR201,DAR401
+    if domain == _ISPU_XSTSIM_APP_DOMAIN and desc is not None:
+        from .ispu_xstsim_app_drv import IspuXstsimAppDriver
+        return IspuXstsimAppDriver.is_valid(desc)
+    return False
+
+
+def _ispu_xstsim_app_create(parent, desc):
+    """ispu xstsim app (legacy) create function"""  # noqa: DAR101,DAR201,DAR401
+    from .ispu_xstsim_app_drv import IspuXstsimAppDriver
+    return IspuXstsimAppDriver(parent), desc
 
 
 def _ispu_target_resolver(domain, desc):
@@ -162,7 +177,8 @@ _DRIVERS = {
     _APP_DOMAIN: (_app_resolver, _app_create),
     _LIB_DOMAIN: (_dll_resolver, _dll_create),
     _SOCKET_DOMAIN: (_socket_resolver, _socket_create),
-    _ISPU_APP_DOMAIN: (_ispu_app_resolver, _ispu_app_create),
+    _ISPU_STREDSIM_APP_DOMAIN: (_ispu_stredsim_app_resolver, _ispu_stredsim_app_create),
+    _ISPU_XSTSIM_APP_DOMAIN: (_ispu_xstsim_app_resolver, _ispu_xstsim_app_create),
     _ISPU_TARGET_DOMAIN: (_ispu_target_resolver, _ispu_target_create),
     _MPU_TARGET_DOMAIN: (_mpu_target_resolver, _mpu_target_create),
     _FVP_DOMAIN: (_fvp_resolver, _fvp_create),
@@ -203,8 +219,11 @@ def ai_runner_resolver(parent, desc):
         if nb_elem == 2 and split_[0] == 'app':
             domain = _APP_DOMAIN
             desc = desc[4:]
-        elif nb_elem == 2 and split_[0] == 'ispu-app':
-            domain = _ISPU_APP_DOMAIN
+        elif nb_elem == 2 and split_[0] == 'ispu-stredsim-app':
+            domain = _ISPU_STREDSIM_APP_DOMAIN
+            desc = desc[9:]
+        elif nb_elem == 2 and split_[0] == 'ispu-xstsim-app':
+            domain = _ISPU_XSTSIM_APP_DOMAIN
             desc = desc[9:]
         elif nb_elem == 2 and split_[0] == 'mpu':
             domain = _MPU_TARGET_DOMAIN

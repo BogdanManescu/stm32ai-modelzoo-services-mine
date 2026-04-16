@@ -144,57 +144,6 @@ def decode_ssd_torch_predictions(predictions_r, cfg):
     boxes = tf.clip_by_value(boxes, 0, 1)
     
     return boxes, scores
-
-def decode_ssd_predictions(predictions: tuple, clip_boxes: bool = True) -> tuple:
-    """
-    An SSD model outputs anchor boxes and offsets. This function
-    applies the offsets to the anchor boxes to obtain the coordinates
-    of the bounding boxes predicted by the model.
-    
-    Arguments:
-        predictions:
-            The SSD model output, a tuple of 3 elements:
-                1. Scores of predicted boxes.
-                   A tf.Tensor with shape [batch_size, num_anchors, num_classes]
-                2. Offsets.
-                   A tf.Tensor with shape [batch_size, num_anchors, 4]
-                3. Anchor boxes.
-                   A tf.Tensor with shape [batch_size, num_anchors, 4]
-        clip_boxes:
-            A boolean. If True, the coordinates of the output bounding boxes
-            are clipped to fit the image. If False, they are left as is. 
-            Defaults to True.
-
-    Returns:
-        scores:
-            The scores of the predicted bounding boxes in each class.
-            A tf.Tensor with shape [batch_size, num_anchors, num_classes]
-        boxes:
-            The predicted bounding boxes in the (x1, y1, x2, y2) coordinates
-            system. (x1, y1) and (x2, y2) are pairs of diagonally opposite 
-            corners. The coordinates values are normalized.
-            A tf.Tensor with shape [batch_size, num_anchors, 4]
-    """
-
-    scores = predictions[0]
-    raw_boxes = predictions[1]
-    anchor_boxes = predictions[2]
-    
-    # Apply anchor offsets to the detection boxes
-    x1 = raw_boxes[..., 0] * (anchor_boxes[..., 2] - anchor_boxes[..., 0]) + anchor_boxes[..., 0]
-    x2 = raw_boxes[..., 2] * (anchor_boxes[..., 2] - anchor_boxes[..., 0]) + anchor_boxes[..., 2]
-    y1 = raw_boxes[..., 1] * (anchor_boxes[..., 3] - anchor_boxes[..., 1]) + anchor_boxes[..., 1]
-    y2 = raw_boxes[..., 3] * (anchor_boxes[..., 3] - anchor_boxes[..., 1]) + anchor_boxes[..., 3]
-
-    boxes = tf.stack([x1, y1, x2, y2], axis=-1)
-    if clip_boxes:
-        boxes = tf.clip_by_value(boxes, 0, 1)
-       
-    # Get rid of the background class
-    scores = scores[..., 1:]
-    
-    return boxes, scores
-
     
 def yolo_head(feats, anchors, num_classes):
     """
@@ -684,7 +633,7 @@ def get_nmsed_detections(cfg, predictions, image_size):
         if cfg.model.framework == "torch":
             boxes, scores = decode_ssd_torch_predictions(predictions, cfg)
         else:
-            boxes, scores = decode_ssd_predictions(predictions)
+            raise ValueError("Unsupported framework for SSD model type")
     elif model_family(cfg.model.model_type) == "st_yolod":
         boxes, scores = decode_yolod_predictions(predictions, cfg)
     elif model_family(cfg.model.model_type) == "yolo":
@@ -711,7 +660,7 @@ def get_nmsed_detections(cfg, predictions, image_size):
         boxes = tf.concat(levels_boxes, axis=1)
         scores = tf.concat(levels_scores, axis=1)
     
-    elif model_family(cfg.model.model_type) == "yolov8n":
+    elif model_family(cfg.model.model_type) in ("yolov8n", "yolo26n"):
         boxes, scores = decode_yolov8n_predictions(predictions)
     elif model_family(cfg.model.model_type) == "yolov4":
         boxes, scores = decode_yolov4_predictions(predictions)
@@ -763,7 +712,7 @@ def get_detections(cfg, predictions, image_size):
         boxes = tf.concat(levels_boxes, axis=1)
         scores = tf.concat(levels_scores, axis=1)
     
-    elif model_family(cfg.model.model_type) == "yolov8n":
+    elif model_family(cfg.model.model_type) in ("yolov8n", "yolo26n"):
         boxes, scores = decode_yolov8n_predictions(predictions)
     elif model_family(cfg.model.model_type) == "st_yolod":
         boxes, scores = decode_yolod_predictions(predictions,cfg)

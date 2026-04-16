@@ -24,8 +24,6 @@ from torch import distributed as dist
 from omegaconf import DictConfig
 import mlflow
 import argparse
-import logging
-from typing import Optional
 from clearml import Task
 from clearml.backend_config.defs import get_active_config_file
 

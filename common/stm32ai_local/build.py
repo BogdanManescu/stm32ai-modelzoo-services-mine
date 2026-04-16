@@ -30,6 +30,9 @@ logger = logging.getLogger(_LOGGER_NAME_)
 
 _EXT_FILE = ('.c', '.h', '.txt', '.raw')
 _STM_AI_LIB_PATTERN = r'(lib)?NetworkRuntime[0-9]{3,}_[A-Za-z0-9]{3,}_[A-Z]{3,}.a'
+_STM_AI_LIB_VERSION_PATTERN = r'NetworkRuntime([0-9]{3,})'
+_STM_AI_LIB_UPDATE_PATTERN = r'((lib)?NetworkRuntime)[0-9]{3,}(_[A-Za-z0-9]{3,}_[A-Z]{3,}.a)'
+_STM_AI_LIB_FILE_PATTERN = r'NetworkRuntime[0-9]{3,}_[A-Za-z0-9]{3,}_[A-Z]{3,}.a'
 
 
 def _get_file_and_subdirectory(root_dir: Union[str, Path]):
@@ -82,10 +85,31 @@ def _update_cube_ide_cproject(prj_dir: str, stm_ai_lib: str):
         with open(c_project, 'r+', encoding='utf-8') as c_prj_file:
             file_data = c_prj_file.read()
             if re.search(_STM_AI_LIB_PATTERN, file_data):
-                n_file_data = re.sub(_STM_AI_LIB_PATTERN, stm_ai_lib, file_data)
+                # Replace only STEdgeAI version number in lib name
+                version_match = re.search(_STM_AI_LIB_VERSION_PATTERN, stm_ai_lib)
+                if version_match:
+                    new_version = version_match.group(1)
+                    updated_libs = set()
+                    def _replace_version(m):
+                        updated = m.group(1) + new_version + m.group(3)
+                        updated_libs.add(updated)
+                        return updated
+                    n_file_data = re.sub(
+                        _STM_AI_LIB_UPDATE_PATTERN,
+                        _replace_version,
+                        file_data
+                    )
+                    for lib in updated_libs:
+                        logger.info(f' -> updating cproject file with \"{lib}\"')
+                else:
+                    n_file_data = re.sub(_STM_AI_LIB_PATTERN, stm_ai_lib, file_data)
+                    logger.info(f' -> updating cproject file with \"{stm_ai_lib}\"')
                 c_prj_file.truncate(0)
                 c_prj_file.seek(0)
                 c_prj_file.write(n_file_data)
+            else:
+                logger.error(f' -> no stedgeai library found in the cproject file, unable to update it!')
+                raise STMAICToolsError('STM32CubeIDE build failed!')
 
 
 def _update_source_tree(session: STMAiSession, user_files: Union[str, List[str], Path, List[Path]]) -> str:
@@ -201,9 +225,113 @@ def _update_source_tree(session: STMAiSession, user_files: Union[str, List[str],
         if count == cur_count:
             not_updated.append(key)
 
-    # if count != len(conf.templates): # COMMENTED FOR NOW, TO BE CORRECTED
-    #     logger.warning(f'all the files are not be updated, {count}/{len(conf.templates)}!')
-    #     logger.warning(f' -> {not_updated}')
+    # Update stedgeai-lib
+    project_path = session.board.config.cwd
+    src = Path(session.generated_dir) / 'stedgeai-lib'
+
+    # Locate lib_parent — the stedgeai-lib root inside the application project's
+    # Middlewares tree — so we can replace Lib/ with the freshly generated one.
+    # cproject_location is resolved early to an absolute path: without resolve()
+    # a relative value like '../application_code/…/STM32CubeIDE' makes glob()
+    # traverse unintended directories (including '.' → generated stedgeai-lib).
+    lib_parent = None
+    conf = session.board.config
+    cproject_location = Path(getattr(conf, 'cproject_location', project_path)).resolve()
+    logger.info(f' -> searching for pre-existing stedgeai-lib from "{cproject_location}"')
+
+    # Strategy 1 (preferred): read the .cproject file.  Eclipse CDT records the
+    # exact library-search-path (e.g. "../../Middlewares/ST/stedgeai-lib/Lib/GCC/…")
+    # relative to the build-output directory, giving us a deterministic answer
+    # regardless of how many matching .a files exist elsewhere in the tree.
+    cproject_file = cproject_location / '.cproject'
+    if cproject_file.is_file():
+        cproject_config = getattr(conf, 'cproject_config', '')
+        build_out_dir = cproject_location / cproject_config
+        with open(cproject_file, 'r', encoding='utf-8') as fp:
+            cproj_text = fp.read()
+        # Pattern 1: clean relative path  value="../../Middlewares/ST/stedgeai-lib/…"
+        # Strict alphanumeric segments exclude the CDT compound-defaults attribute
+        # (value="com.st.…") and quirky Release paths that start with ".././".
+        m = re.search(r'value="((?:\.\./)+(?:[A-Za-z0-9][A-Za-z0-9_\-]*/)*stedgeai-lib)(?:/[^"]*)?\"', cproj_text)
+        if m:
+            candidate = (build_out_dir / m.group(1)).resolve()
+            if candidate.is_dir():
+                lib_parent = candidate
+        # Pattern 2: Eclipse workspace-relative  ${workspace_loc:/ProjName/…/stedgeai-lib/…}
+        if not lib_parent:
+            m = re.search(r'workspace_loc:/[^/]+(/(?:[^/"\s|]+/)*stedgeai-lib)', cproj_text)
+            if m:
+                rel_path = m.group(1).lstrip('/')
+                for ancestor in cproject_location.parents:
+                    candidate = (ancestor / rel_path).resolve()
+                    if candidate.is_dir() and any(candidate.rglob('*.a')):
+                        lib_parent = candidate
+                        break
+        # Pattern 3: STM32N6 projects use "Middlewares/ST/AI" instead of "stedgeai-lib"
+        # e.g. value="../../../../Middlewares/ST/AI/Lib/GCC/ARMCortexM55"
+        if not lib_parent:
+            m = re.search(r'value="((?:\.\./)+(?:[A-Za-z0-9][A-Za-z0-9_\-]*/)*Middlewares/ST/AI)(?:/[^"]*)?\"', cproj_text)
+            if m:
+                candidate = (build_out_dir / m.group(1)).resolve()
+                if candidate.is_dir():
+                    lib_parent = candidate
+
+    # Strategy 2 (fallback): find the pre-existing .a that matches the same
+    # CPU/toolchain variant as the newly generated one (e.g. _CM33_GCC.a).
+    # Search is deliberately scoped to the immediate project root (cproject parent)
+    # and restricted to paths containing 'Middlewares' so that stale archival
+    # copies in Utils/Deploy/… are not mistaken for the live library.
+    if not lib_parent:
+        new_a = next(src.rglob('*.a'), None)
+        if new_a:
+            m = re.match(r'(?:lib)?NetworkRuntime\d+((?:_[A-Za-z0-9+]+)+\.a)$', new_a.name)
+            if m:
+                suffix = m.group(1)  # e.g. "_CM33_GCC.a"
+                project_root = cproject_location.parent
+                for match in sorted(project_root.glob(f'**/*{suffix}')):
+                    if 'Middlewares' not in match.parts:
+                        continue
+                    for p in match.parents:
+                        if p.name == 'Lib':
+                            lib_parent = p.parent
+                            break
+                    if lib_parent:
+                        break
+
+    # lib_parent is the stedgeai-lib folder of the GettingStarted
+    if not lib_parent:
+        logger.error(f' -> stedgeai-lib directory not found in the cube ide project, unable to update it!')
+        raise STMAICToolsError('STM32CubeIDE build failed!')
+
+    logger.info(f' -> updating stedgeai-lib at "{lib_parent}" from "{src}"')
+
+    # Record existing Npu/Devices subdirs before update so we can prune any
+    # new device folders added by the cloud package.
+    existing_npu_devices = set()
+    npu_devices_dir = lib_parent / 'Npu' / 'Devices'
+    if npu_devices_dir.is_dir():
+        existing_npu_devices = {d.name for d in npu_devices_dir.iterdir() if d.is_dir()}
+
+    # Selective update strategy: only fully replace Lib/ (old .a removed, new
+    # ones copied in); overlay everything else so project-specific directories
+    # (Misc/, Reloc/, SystemPerformance/) that are absent from the cloud package
+    # are preserved.
+    _remove_tree(lib_parent / 'Lib')
+    for src_item in src.iterdir():
+        if os.path.isdir(src_item):
+            _copy_tree(src_item, lib_parent / src_item.name)
+        elif os.path.isfile(src_item):
+            shutil.copy2(src_item, lib_parent / src_item.name)
+
+    # Remove Npu/Devices subdirs that are new (not present before) — the project
+    # has no include paths for them and they would break compilation.
+    if existing_npu_devices:
+        new_npu_devices_dir = lib_parent / 'Npu' / 'Devices'
+        if new_npu_devices_dir.is_dir():
+            for device_dir in list(new_npu_devices_dir.iterdir()):
+                if device_dir.is_dir() and device_dir.name not in existing_npu_devices:
+                    logger.info(f' -> removing unknown Npu device dir: {device_dir.name}')
+                    _remove_tree(device_dir)
 
     return stm_ai_lib
 
@@ -338,14 +466,35 @@ def _programm_dev_board(config, series:str="", serial_number=None):
                 return 1
 
         if series == "stm32n6" and serial_number:
-            cmd_line_sign = config.sign_cmd
+            if hasattr(config, 'extract_ecblob_cmd') and hasattr(config, 'make_binary_cmd'):
+                cmd_line_extract_ecblob = config.extract_ecblob_cmd
+                cmd_line_make_binary = config.make_binary_cmd
 
+                if isinstance(cmd_line_extract_ecblob, list):
+                    str_args_extract_ecblob = ' '.join([str(x) for x in config.extract_ecblob_cmd])
+                else:
+                    str_args_extract_ecblob = config.extract_ecblob_cmd
+                if isinstance(cmd_line_make_binary, list):
+                    str_args_make_binary = ' '.join([str(x) for x in config.make_binary_cmd])
+                else:
+                    str_args_make_binary = config.make_binary_cmd
+
+                res_code, _ = run_shell_cmd(str_args_extract_ecblob,
+                            cwd=config.cwd,
+                            logger=logger,
+                            parser=parser)
+                res_code, _ = run_shell_cmd(str_args_make_binary,
+                            cwd=config.cwd,
+                            logger=logger,
+                            parser=parser)
+
+            cmd_line_sign = config.sign_cmd
             if isinstance(cmd_line_sign, list):
                 str_args_sign = ' '.join([str(x) for x in config.sign_cmd])
             else:
                 str_args_sign = config.sign_cmd
 
-            res_code, _ =run_shell_cmd(str_args_sign,
+            res_code, _ = run_shell_cmd(str_args_sign,
                         cwd=config.cwd,
                         logger=logger,
                         parser=parser)
@@ -382,6 +531,7 @@ def _programm_dev_board(config, series:str="", serial_number=None):
             str_args_network_data = ' '.join([str(x) for x in config.flash_network_data_cmd])
         else:
             str_args_network_data = config.flash_network_data_cmd
+
         mode = re.search('mode=HOTPLUG', str_args_network_data, re.IGNORECASE)
         hardRst = re.search('-hardRst', str_args_network_data, re.IGNORECASE)
 
@@ -391,11 +541,31 @@ def _programm_dev_board(config, series:str="", serial_number=None):
                     cwd=config.cwd,
                     logger=logger,
                     parser=parser)
-    if res_code or (parser and parser.error):
-        logger.error(f'Board programming failed: "{parser.error}"')
-        raise STMAICToolsError('Board programming failed!')
-    
-    if series == "stm32n6" and serial_number:
+        if res_code or (parser and parser.error):
+            logger.error(f'Board programming failed: "{parser.error}"')
+            raise STMAICToolsError('Board programming failed!')
+
+        if hasattr(config, 'flash_ecblob_cmd'):
+            cmd_line_ecblob = config.flash_ecblob_cmd
+
+            if isinstance(cmd_line_ecblob, list):
+                str_args_ecblob = ' '.join([str(x) for x in config.flash_ecblob_cmd])
+            else:
+                str_args_ecblob = config.flash_ecblob_cmd
+
+            mode = re.search('mode=HOTPLUG', str_args_ecblob, re.IGNORECASE)
+            hardRst = re.search('-hardRst', str_args_ecblob, re.IGNORECASE)
+
+            str_args_ecblob = str_args_ecblob[:mode.start()+12] + f' sn={str(serial_number)}' + " --extload " + path_external_loader + str_args_ecblob[hardRst.end():]
+
+            res_code, _ = run_shell_cmd(str_args_ecblob,
+                        cwd=config.cwd,
+                        logger=logger,
+                        parser=parser)
+            if res_code or (parser and parser.error):
+                logger.error(f'Board programming failed: "{parser.error}"')
+                raise STMAICToolsError('Board programming failed!')
+
         cmd_line_fsbl = config.flash_fsbl_cmd
         if isinstance(cmd_line_fsbl, list):
             str_args_fsbl = ' '.join([str(x) for x in config.flash_fsbl_cmd])
@@ -477,7 +647,6 @@ def _cube_ide_builder(cube_ide_exe: str, session: STMAiSession, conf: Any,
             logger.info(f'updating.. {conf.name}')
             stm_ai_lib = _update_source_tree(session, user_files)
         if stm_ai_lib and not session.board.stm_ai_version.is_valid():
-            logger.info(f' -> updating cproject file \"{prj_dir}\" with \"{stm_ai_lib}\"')
             _update_cube_ide_cproject(prj_dir, stm_ai_lib)
 
         parser = ParserErrorCubeIde()
@@ -530,9 +699,6 @@ def cmd_build(
         return
 
     logger.info('deploying the c-project.. %s', str(board))
-
-    # logger.info('checking series.. NOT YET IMPLEMENTED')
-    # logger.info('checking memory... NOT YET IMPLEMENTED')
 
     if used_conf.builder == 'stm32_cube_ide':
 

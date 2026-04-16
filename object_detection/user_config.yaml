@@ -18,7 +18,8 @@ dataset:
   format: tfs
   dataset_name: coco
   class_names: [person]
-  training_path: ./datasets/od_coco_2017_person/train
+  train_images_path: /local/data/mini_od_person/tfs/train/images
+  train_annotations_path: /local/data/mini_od_person/tfs/train/annotations
   validation_split: 0.1
   prediction_path:
   quantization_path:
@@ -59,7 +60,7 @@ data_augmentation:
 training:
   dropout: null
   batch_size: 64
-  epochs: 400
+  epochs: 403
   optimizer:
     Adam:
       learning_rate: 0.0025

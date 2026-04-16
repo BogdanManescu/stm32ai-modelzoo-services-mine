@@ -13,6 +13,7 @@ import os
 import logging
 import glob
 import shutil
+from pathlib import Path
 from typing import Union
 
 from .session import STMAiSession
@@ -84,30 +85,12 @@ def _copy_ai_runtime_files(session: STMAiSession):
 
     tools = session.tools
     dst_dir = session.generated_dir
-    inc_dir = tools.ai_runtime_inc()
-    lib = tools.ai_runtime_lib(series=series)
-    neural_art = tools.neural_art(series=series)
+    stedgeai_lib = tools.stedgeai_lib()
 
-    if session.series == 'stm32n6':
-        lib_dst_dir = os.path.join(dst_dir, 'Lib/GCC/ARMCortexM55')
-    else:
-        lib_dst_dir = os.path.join(dst_dir, 'Lib')
+    lib_dst_dir = Path(dst_dir) / 'stedgeai-lib'
     if os.path.isdir(lib_dst_dir):
         shutil.rmtree(lib_dst_dir)
-    os.makedirs(lib_dst_dir, exist_ok=True)
-    shutil.copy(lib, lib_dst_dir)
-
-    lib_dst_dir = os.path.join(dst_dir, 'Inc')
-    if os.path.isdir(lib_dst_dir):
-        shutil.rmtree(lib_dst_dir)
-    shutil.copytree(inc_dir, lib_dst_dir)
-
-    if session.series == 'stm32n6':
-        lib_dst_dir = os.path.join(dst_dir, 'Npu/ll_aton')
-        if os.path.isdir(lib_dst_dir):
-            shutil.rmtree(lib_dst_dir)
-        # os.makedirs(lib_dst_dir, exist_ok=True)
-        shutil.copytree(neural_art, lib_dst_dir)
+    shutil.copytree(stedgeai_lib, lib_dst_dir)
 
 def cmd_compile(
         session: STMAiSession,

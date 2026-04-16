@@ -39,10 +39,11 @@ Information about the dataset you want to use for evaluation is provided in the 
 
 ```yaml
 dataset:
-  format: tfs                          # Dataset format. Required, accepts [tfs, coco, pascal_voc, darknet_yolo] 
-  dataset_name: coco                   # Dataset name. Required, accepts [custom_dataset, coco, pascal_voc, darknet_yolo]
-  class_names: [person]                # Class names. Required, list of the supported classes.
-  test_path: <test-set-root-directory> # Path to the root directory of the test set.
+  format: coco                                     # Dataset format. Required, accepts [tfs, coco, pascal_voc, darknet_yolo] 
+  dataset_name: coco                               # Dataset name. Required, accepts [custom_dataset, coco, pascal_voc, darknet_yolo]
+  class_names: [person]                            # Class names. Required, list of the supported classes.
+  test_images_path: <test-set-root-directory>      # Path to the root directory of the test set images.
+  test_annotations_path: <test-set-root-directory> # Path to the JSON file of the test set annotations.
 ```
 
 * **format**: Defines the annotation format of your dataset. This must match the format of your dataset annotations.
@@ -61,7 +62,7 @@ dataset:
 | `darknet_yolo`   | `darknet_yolo`, `tfs`   | Native Darknet YOLO format or TFS TensorFlow format                                             |
 | `custom_dataset` | `tfs`                   | Only TFS TensorFlow format; in case the dataset is already converted before evaluation                          |
 
-In this example, we are using the `coco` dataset in the `tfs` format and the path to the validation set is provided in the `test_path` parameter.
+In this example, we are using the `coco` dataset in the `coco` format and the path to the test set is provided in the `test_images_path` and `test_annotations_path` parameters to evaluate the model's performance.
 
 The state machine below describes the rules to follow when handling dataset paths for the evaluation.
 <div align="center" style="width:50%; margin: auto;">
@@ -71,19 +72,17 @@ The state machine below describes the rules to follow when handling dataset path
 
 When working with a dataset for the first time, we suggest setting the `check_image_files` attribute to True. This will enable the system to load each image file and identify any corrupt, unsupported, or non-image files. The path to any problematic files will be reported.
 
-In cases where there is no validation set path or test set provided to evaluate the model trained using the training service, the available data under the `training_path` directory is split into two to create a training set and a validation set. By default, 80% of the data is used for training and the remaining 20% is used for the validation set in the evaluation service.
+In cases where there is no validation set path or test set provided to evaluate the model trained using the training service, the available data under the `train_images_path` and `test_annotations_path` directories is split into two to create a training set and a validation set. By default, 80% of the data is used for training and the remaining 20% is used for the validation set in the evaluation service.
 
 If you want to use a different split ratio, you need to specify the percentage to be used for the validation set in the `validation_split` parameter (to ensure consistency in the [training](./README_TRAINING.md) and evaluation process, you must specify the same validation_split parameter value in both the training and evaluation services), as shown in the YAML example below:
 
 ```yaml
 dataset:
-  format: tfs
+  format: coco
   dataset_name: coco
   class_names: [person]
-  training_path: ./datasets/COCO_2017_person/
-  validation_path:
-  validation_split: 0.20
-  test_path:
+  test_images_path: ./datasets/COCO_2017_person/val_2017
+  test_images_path: ./datasets/COCO_2017_person/annotations/person_val2017.json
 ```
 
 </details></ul>

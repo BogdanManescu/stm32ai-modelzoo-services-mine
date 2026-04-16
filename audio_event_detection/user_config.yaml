@@ -1,14 +1,13 @@
 general:
   project_name: aed_project
-  model_path: 
   logs_dir: logs
   saved_models_dir: saved_models
   global_seed: 120
   gpu_memory_limit: 5
-  display_figures: True 
+  display_figures: False
 
 
-operation_mode: chain_tqe #chain_tqeb
+operation_mode: chain_tqeb #chain_tqeb
 #choices=['training' , 'evaluation', 'prediction', 'deployment', 'quantization', 'benchmarking',
 #        'chain_tqeb','chain_tqe',' chain_eqe','chain_qb','chain_eqeb','chain_qd ']
 model: 
@@ -20,12 +19,19 @@ dataset:
   dataset_name: esc10
   class_names: ['dog', 'chainsaw', 'crackling_fire', 'helicopter', 'rain', 'crying_baby', 'clock_tick', 'sneezing', 'rooster', 'sea_waves']
   file_extension: '.wav'
-  training_audio_path: ../datasets/ESC-50/audio # Mandatory
-  training_csv_path:   ../datasets/ESC-50/meta/esc50.csv # Mandatory
+  training_audio_path: ./datasets/ESC-50/audio # Mandatory
+  training_csv_path:   ./datasets/ESC-50/meta/esc50.csv # Mandatory
 
   validation_audio_path: # Optional
   validation_csv_path: # Optional
   validation_split: 0.2  # Optional, default value is 0.2
+
+  quantization_audio_path: # Optional
+  quantization_csv_path: # Optional
+  quantization_split: 0.1 # Optional
+
+  test_audio_path: # Optional
+  test_csv_path: # Optional
 
   multi_label: False 
   use_garbage_class: False 
@@ -85,7 +91,7 @@ training:
   dropout: 0
   batch_size: 16
   epochs: 50 
-  resume_training: # Optional, use to resume a training from a previous experiment.                  
+  resume_training: # Optional, use to resume a training from a previous experiment.
   optimizer:
     Adam:
       learning_rate: 0.001
@@ -101,14 +107,32 @@ training:
       mode: max
       restore_best_weights: true
       patience: 60
-
+      
 quantization:
   quantizer: TFlite_converter
   quantization_type: PTQ
   quantization_input_type: int8
   quantization_output_type: float
+  granularity: per_channel          # Optional, defaults to "per_channel". 
+  # optimize: True                     # Optional, defaults to False.
+  # target_opset: 17                   # Optional, defaults to 17. Only used for ONNX quantization
+  onnx_extra_options: 
+    CalibMovingAverage: True
+  onnx_quant_parameters:
+    op_types_to_quantize: ["Conv", "Relu", "Squeeze", "GlobalAveragePool", "Gemm", "Transpose"] #All except softmax to preserve float output. Transpose probably unnecessary.
   export_dir: quantized_models
 
+
+tools:
+  stedgeai:
+    optimization: balanced
+    on_cloud: True
+    path_to_stedgeai: C:/ST/STEdgeAI/<x.y>/Utilities/windows/stedgeai.exe
+  path_to_cubeIDE: C:/ST/STM32CubeIDE_<*.*.*>/STM32CubeIDE/stm32cubeide.exe
+
+benchmarking:
+  board: B-U585I-IOT02A
+  
 mlflow:
   uri: ./tf/src/experiments_outputs/mlruns
 

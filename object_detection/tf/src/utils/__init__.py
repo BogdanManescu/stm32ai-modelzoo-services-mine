@@ -6,7 +6,6 @@
 #  * If no LICENSE file comes with this software, it is provided AS-IS.
 #  *--------------------------------------------------------------------------------------------*/
 
-from .anchor_boxes_utils import get_sizes_ratios_ssd_v1, get_sizes_ratios_ssd_v2, get_fmap_sizes, gen_anchors, get_anchor_boxes
 from .parse_config import parse_dataset_section, parse_preprocessing_section, parse_data_augmentation_section, get_config
 from .models_mgt import ai_runner_invoke, change_model_input_shape, change_yolo_model_number_of_classes, \
                         change_yolo_x_model_number_of_classes

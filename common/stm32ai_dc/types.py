@@ -92,6 +92,7 @@ class CliLibrarySerie(str, Enum):
     STM32C0 = "STM32C0"
     STM32WL = "STM32WL"
     STM32MP1 = "STM32MP1"
+    STM32U3 = "STM32U3"
 
 
 class CliLibraryIde(str, Enum):
@@ -1133,6 +1134,11 @@ class CliParameters(typing.NamedTuple):
     splitWeights: Optional[bool] = False
     """ Optional:  generate a C-data file with a C-table by layer (not supported with the optional '--binary' option) """
 
+    hsp: Optional[int] = None
+    """ Optional: reserved size of the BRAM (in word, default: 4096) to
+        enable the support of the Hardware Signal Processing (HSP) unit
+    """
+
     optimization: Optional[CliParameterOptimization] = None
     """ 
         define global optimization objectives 
@@ -1320,6 +1326,7 @@ class ValidateResultMetrics(typing.NamedTuple):
     rmse: float
     std: float
     ts_name: str
+    cos: float
 
 
 class ValidateResult(typing.NamedTuple):

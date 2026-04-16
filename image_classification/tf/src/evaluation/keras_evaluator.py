@@ -9,22 +9,15 @@
 
 # Import necessary libraries
 import os
-import sys
-from pathlib import Path
 import warnings
-import sklearn
-import mlflow
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
-from typing import Tuple, Optional, List, Dict
-import numpy as np
 
 # Suppress warnings and TensorFlow logs
 warnings.filterwarnings("ignore")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import onnxruntime
 import tensorflow as tf
-import tqdm
+import mlflow
 
 # Import utility functions
 from image_classification.tf.src.utils import get_loss

@@ -23,6 +23,7 @@ You can get comprehensive footprints and performance information for each model 
 - [yolov2t](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/yolov2t/README.md) - This is a lightweight version of the original YOLO (You Only Look Once) object detection algorithm targetting embedded devices with limited computational resources.
 - [yolov8n](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/yolov8n/README.md) - This is an advanced object detection model from Ultralytics that builds upon the strengths of its predecessors in the YOLO series. YOLOv8 incorporates state-of-the-art techniques such as improved backbone networks, better feature pyramid networks, and advanced anchor-free detection heads, making it highly efficient for various computer vision tasks.
 - [yolov11n](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/yolov11n/README.md) - This is an even more recent variant of the YOLO family from Ultralytics. Topology is improved for efficiency, speed, accuracy with lower number of parameters.
+- [yolo26n](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/yolo26n/README.md) - This is a new variant of the YOLO family from Ultralytics. Topology is improved for efficiency, speed, accuracy with lower number of parameters.
 - [face_detect_front](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/object_detection/facedetect_front/README.md) - BlazeFace Front 128x128 is a lightweight and efficient variant of the BlazeFace architecture, designed specifically for detecting frontal faces at a resolution of 128x128 pixels
 
 - `yolov4` - Version 4 from Nvidia TAO train adapt and optimize toolkit with different possible backbones for feature extractions including different versions of resnet, mobilenet, darknet, efficientnet, vgg, and cspdarknet
@@ -36,6 +37,7 @@ The exhaustive list of `model_type` and corresponding `model_name` attributes cu
 |-----------------------|----------------------|
 | `yolov8n`             | X         |
 | `yolov11n`            | X         |
+| `yolo26n`             | X         |
 | `yolov5u`             | X         |
 | `st_yoloxn`           | `st_yoloxn`, `st_yoloxn_d033_w025`, `st_yoloxn_d100_w025`, `st_yoloxn_d050_w040`        |
 | `st_yololcv1`         | `st_yololcv1`|

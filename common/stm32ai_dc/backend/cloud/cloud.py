@@ -7,6 +7,10 @@
 
 
 import os
+import glob
+import re
+import pathlib
+import shutil
 import functools
 import typing
 from common.stm32ai_dc.backend.cloud.generate_nbg_service import GenerateNbgService
@@ -49,6 +53,7 @@ class CloudBackend(Stm32AiBackend):
         except Exception as e:    
             print(
                 f'[WARN] Version {self.version} for platform {platform} is not supported by Developer Cloud.')
+            latest = None
             for v in self.supported_versions:
                 if (v.get('isLatest', False) == True):
                     latest = v
@@ -145,17 +150,17 @@ class CloudBackend(Stm32AiBackend):
         )
         return analyze_result
 
-    def generate(self, options: CliParameters) -> GenerateResult:
+    def generate(self, options: CliParameters, timeout = 300) -> GenerateResult:
         import zipfile  # Local import to avoid global perf drawback
 
         if not os.path.exists(options.output):
             os.makedirs(options.output, exist_ok=True)
 
         rid = self.stm32ai_service.trigger_generate(options)
-        result = self.stm32ai_service.wait_for_run(rid)
+        result = self.stm32ai_service.wait_for_run(rid, timeout=timeout)
 
         if result is None or 'url' not in result:
-            if 'message' in result:
+            if result is not None and 'message' in result:
                 raise GenerateServerError(f"Missing data in server \
                     response: {result.get('message')}")
             raise GenerateServerError('Missing data in server response')
@@ -169,6 +174,29 @@ class CloudBackend(Stm32AiBackend):
                 zfile = zipfile.ZipFile(local_filepath)
                 zfile.extractall(options.output)
                 zfile.close()
+                # Move library folders into stedgeai-lib subfolder to match
+                # the on_cloud=False structure produced by _copy_ai_runtime_files
+                lib_dst_dir = os.path.join(options.output, 'stedgeai-lib')
+                os.makedirs(lib_dst_dir, exist_ok=True)
+                for lib_folder in ['Lib', 'Npu', 'Inc']:
+                    src_path = os.path.join(options.output, lib_folder)
+                    if os.path.isdir(src_path):
+                        shutil.move(src_path, os.path.join(lib_dst_dir, lib_folder))
+                # Move each flat .a at the top-level of Lib/ into the canonical deep
+                # Lib/<toolchain>/<cpu>/<file>.a path used by all C project linkers.
+                lib_dir = os.path.join(lib_dst_dir, 'Lib')
+                if os.path.isdir(lib_dir):
+                    for a_file in glob.glob(os.path.join(lib_dir, '*.a')):
+                        a_path = pathlib.Path(a_file)
+                        filename = a_path.name
+                        cpu_match = re.search(r'NetworkRuntime\d+_(CM\d+[+]?)', filename)
+                        toolchain_match = re.search(r'_(GCC|IAR|MDK)\.a$', filename, re.IGNORECASE)
+                        if cpu_match and toolchain_match:
+                            toolchain = toolchain_match.group(1).upper()
+                            cpu = 'ARMCortexM' + cpu_match.group(1)[2:]  # CM33 → ARMCortexM33
+                            dest_dir = pathlib.Path(lib_dir) / toolchain / cpu
+                            dest_dir.mkdir(parents=True, exist_ok=True)
+                            shutil.move(str(a_path), str(dest_dir / filename))
                 return GenerateResult(
                     server_url=result.get('url', None),
                     zipfile_path=local_filepath, output_path=options.output,
@@ -184,7 +212,7 @@ class CloudBackend(Stm32AiBackend):
         result = self.stm32ai_service.wait_for_run(rid)
 
         if result is None:
-            if 'message' in result:
+            if result is not None and 'message' in result:
                 raise ValidateServerError(f"Missing data in server \
                     response: {result.get('message')}")
             raise ValidateServerError('Missing data in server response')
@@ -204,7 +232,8 @@ class CloudBackend(Stm32AiBackend):
                     mean=valmetrics['mean'],
                     rmse=valmetrics['rmse'],
                     std=valmetrics['std'],
-                    ts_name=valmetrics.get('ts_name', '')
+                    ts_name=valmetrics.get('ts_name', ''),
+                    cos=valmetrics.get('cos', ''),
                 ))
             cinfo_graph = cinfo['graphs'][0]
             memory_footprint=cinfo.get('memory_footprint', {})
@@ -242,10 +271,11 @@ class CloudBackend(Stm32AiBackend):
                     description=valmetrics['desc'],
                     l2r=valmetrics['l2r'],
                     mae=valmetrics['mae'],
-                    mean=valmetrics['mae'],
+                    mean=valmetrics['mean'],
                     rmse=valmetrics['rmse'],
                     std=valmetrics['std'],
-                    ts_name=valmetrics['ts_name']
+                    ts_name=valmetrics['ts_name'],
+                    cos=valmetrics.get('cos', ''),
                 ))
             validate_result = ValidateResult(
                 rom_size=report['rom_size'],
@@ -313,7 +343,8 @@ class CloudBackend(Stm32AiBackend):
                         mean=valmetrics['mean'],
                         rmse=valmetrics['rmse'],
                         std=valmetrics['std'],
-                        ts_name=valmetrics.get('ts_name', '')
+                        ts_name=valmetrics.get('ts_name', ''),
+                        cos=valmetrics.get('cos', ''),
                     ))
                 cinfo_graph = cinfo['graphs'][0]
                 graph = result['benchmark']['graph']
@@ -391,7 +422,8 @@ class CloudBackend(Stm32AiBackend):
                         mean=valmetrics['mean'],
                         rmse=valmetrics['rmse'],
                         std=valmetrics['std'],
-                        ts_name=valmetrics['ts_name']
+                        ts_name=valmetrics['ts_name'],
+                        cos=valmetrics.get('cos', ''),
                     ))
                 graph = benchmark['graph']
                 exec_time = graph['exec_time']

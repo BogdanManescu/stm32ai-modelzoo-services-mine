@@ -61,9 +61,12 @@ dataset:
   format: tfs
   dataset_name: custom_dataset
   class_names: [<your-classes>]
-  training_path: <train-set-root-directory>  
-  validation_path: <validation-set-root-directory>  
-  test_path: <test-set-root-directory>
+  train_images_path: <train-set-root-directory>  
+  train_annotations_path: <train-set-root-directory>  
+  val_images_path: <validation-set-root-directory>  
+  val_annotations_path: <validation-set-root-directory>  
+  test_images_path: <test-set-root-directory> 
+  test_annotations_path: <test-set-root-directory>
   # Needed if quantization in operation mode
   quantization_path: <quantization-set-root-directory>  
   quantization_split: 0.3

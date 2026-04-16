@@ -157,7 +157,7 @@ def _dispatch_weights(internalFlashSizeFlash_KB: str,
     os.replace(os.path.join(os.path.dirname(path_network_data_params), 'network_data_params_modify.c'), path_network_data_params)
 
 
-def stm32ai_deploy(target: bool = False,
+def stm32ai_deploy(target: str = None,
                    stlink_serial_number: str = None,
                    stedgeai_core_version: str = None,
                    c_project_path: str = None,
@@ -177,13 +177,14 @@ def stm32ai_deploy(target: bool = False,
                    credentials: list[str] = None,
                    on_cloud: bool =False,
                    check_large_model:bool = False,
+                   build_conf: str = None,
                    cfg = None,
                    custom_objects: Dict = None) -> None:
     """
     Deploy an STM32 AI model to a target device.
 
     Args:
-        target (bool): Whether to generate the STM32Cube.AI library and header files on the target device. Defaults to False.
+        target (str): Board name.
         stedgeai_core_version (str): Version of the STEdgeAI Core to use.
         c_project_path (str): Path to the STM32CubeIDE C project.
         output_dir (str): Path to the output directory.
@@ -202,10 +203,15 @@ def stm32ai_deploy(target: bool = False,
         credentials list[str]: User credentials used before to connect.
         on_cloud(bool): whether to deploy using the cloud. Defaults to False
         check_large_model: Launch an analysis to check if the model fit in internal memory, if not it will dispatch in internal and external
-
+        build_conf (str, optional) : Name of the build conf to use when building the C app. If None, picks the first conf in stmai_c_project.conf
     Returns:
         split_weights (bool): return true if the weights has been splitted; False otherwise
     """
+    
+    # We only want to use HSP for series that support it, otherwise CLI crashes
+    # Since it is set by default to 4096 in cfg_utils if absent from config file
+    # We perform a separate check here
+    hsp = cfg.tools.stedgeai.hsp if stm32ai_serie.lower() == "stm32u3" else None
 
     def _stmaic_local_call(session):
         """
@@ -228,7 +234,8 @@ def stm32ai_deploy(target: bool = False,
             # Clean up the STM32Cube.AI output directory
             shutil.rmtree(stm32ai_output, ignore_errors=True)
             # Set the compiler options
-            opt = stmaic.STMAiCompileOptions(no_inputs_allocation=False, no_outputs_allocation=False)
+            opt = stmaic.STMAiCompileOptions(no_inputs_allocation=False, no_outputs_allocation=False,
+                                             hsp=hsp)
             opt.optimization = optimization
 
             # Compile the AI model
@@ -239,9 +246,11 @@ def stm32ai_deploy(target: bool = False,
             split_ram = False
 
             # Get footprints of the given model
-            benchmark_model(optimization=optimization, model_path=model_path,
+            benchmark_model(board_name=target,
+                            optimization=optimization, model_path=model_path,
                             path_to_stm32ai=path_to_stm32ai, stm32ai_output=stm32ai_output,
-                            stedgeai_core_version=stedgeai_core_version, get_model_name_output=get_model_name_output)
+                            stedgeai_core_version=stedgeai_core_version, get_model_name_output=get_model_name_output,
+                            hsp=hsp)
             with open(os.path.join(stm32ai_output, 'network_c_info.json'), 'r') as f:
                 report = json.load(f)
 
@@ -278,7 +287,9 @@ def stm32ai_deploy(target: bool = False,
             shutil.rmtree(stm32ai_output, ignore_errors=True)
 
             # Set the compiler options
-            opt = stmaic.STMAiCompileOptions(no_inputs_allocation=False, no_outputs_allocation=False, split_weights=split_weights)
+
+            opt = stmaic.STMAiCompileOptions(no_inputs_allocation=False, no_outputs_allocation=False, split_weights=split_weights,
+                                             hsp=hsp)
             opt.optimization = optimization
 
             if split_ram:
@@ -323,7 +334,7 @@ def stm32ai_deploy(target: bool = False,
 
     # 2 - set the board configuration
     board_conf = os.path.join(c_project_path, stmaic_conf_filename)
-    board = stmaic.STMAiBoardConfig(board_conf)
+    board = stmaic.STMAiBoardConfig(board_conf, build_conf)
     session.set_board(board)
     print("[INFO] : Selected board : ", board, flush=True)
 
@@ -345,8 +356,11 @@ def stm32ai_deploy(target: bool = False,
             if not check_large_model:
 
                 ai.generate(CliParameters(model=model_path, output=stm32ai_output, fromModel=get_model_name_output,
+                        hsp=hsp,
+                        target=stm32ai_serie.lower(),
                         includeLibraryForSerie=CliLibrarySerie(stm32ai_serie.upper()),
-                        includeLibraryForIde=CliLibraryIde(stm32ai_ide.lower())))
+                        includeLibraryForIde=CliLibraryIde(stm32ai_ide.lower())),
+                        timeout=3600)
 
             else:
                 split_weights = False
@@ -377,11 +391,13 @@ def stm32ai_deploy(target: bool = False,
 
                 # memory_pool_path = board.config.memory_pool_path if hasattr(board.config, 'memory_pool_path') in locals() else None
                 memory_pool_path = board.config.memory_pool_path if split_ram else None
-
                 ai.generate(CliParameters(model=model_path, output=stm32ai_output, fromModel=get_model_name_output,
                                             includeLibraryForSerie=CliLibrarySerie(stm32ai_serie.upper()),
                                             splitWeights=split_weights, target_info=memory_pool_path,
-                                            includeLibraryForIde=CliLibraryIde(stm32ai_ide.lower())))
+                                            hsp=hsp,
+                                            target=stm32ai_serie.lower(),
+                                            includeLibraryForIde=CliLibraryIde(stm32ai_ide.lower())),
+                                            timeout=3600)
 
                 path_network_c_info = os.path.join(session.generated_dir, "network_c_info.json")
 
@@ -410,7 +426,10 @@ def stm32ai_deploy(target: bool = False,
                     stm32ai_output = os.path.join(output_dir, "generated")
 
                 # Check if STM32Cube.AI was used locally to add the Lib/Inc generation
-                if not os.listdir(stm32ai_output) or ('Lib' or 'Inc') not in os.listdir(stm32ai_output):
+                # Note: cloud generate moves Lib/Inc into stedgeai-lib/, so check for that too
+                listing = os.listdir(stm32ai_output)
+                has_libs = 'stedgeai-lib' in listing or 'Lib' in listing or 'Inc' in listing
+                if not listing or not has_libs:
                     _stmaic_local_call(session)
         else:
             _stmaic_local_call(session)
@@ -429,7 +448,7 @@ def stm32ai_deploy(target: bool = False,
 
     stmaic.build(session, user_files=user_files, serial_number=stlink_serial_number)
 
-def stm32ai_deploy_stm32n6(target: bool = False,
+def stm32ai_deploy_stm32n6(target: str = None,
                    stlink_serial_number: str = None,
                    stedgeai_core_version: str = None,
                    c_project_path: str = None,
@@ -463,7 +482,7 @@ def stm32ai_deploy_stm32n6(target: bool = False,
     Deploy an STM32 AI model to a target device.
 
     Args:
-        target (bool): Whether to generate the STM32Cube.AI library and header files on the target device. Defaults to False.
+        target (str): Board name
         c_project_path (str): Path to the STM32CubeIDE C project.
         verbosity (int, optional): Level of verbosity for the STM32Cube.AI driver. Defaults to None.
         debug (bool, optional): Whether to enable debug mode. Defaults to False.
@@ -540,14 +559,20 @@ def stm32ai_deploy_stm32n6(target: bool = False,
         if login_success:
 
             with open(session._board_config.config.neuralart_user_path) as file:
-                neuralart_options = json.load(file)
-            neuralart_options = neuralart_options['Profiles']['default']["options"].replace('--', "--atonnOptions.")
+                neuralart_data = json.load(file)
+            neuralart_profile = neuralart_data['Profiles'][session._board_config.config.profile]
+            neuralart_options = neuralart_profile["options"].replace('--', "--atonnOptions.")
+            if hasattr(board._conf, 'mpool'):
+                mpool = board._conf.mpool
+            else:
+                mpool = os.path.join(os.path.dirname(session._board_config.config.neuralart_user_path), neuralart_profile["memory_pool"])
 
             # Generate the model C code and library
             ai.generate(CliParameters(model=model_path, output=stm32ai_output, fromModel=get_model_name_output, target="stm32n6", stNeuralArt="default",
-                                    allocateInputs=False, allocateOutputs=False, mpool=board._conf.mpool, extraCommandLineArguments=neuralart_options,
+                                    allocateInputs=False, allocateOutputs=False, mpool=mpool, extraCommandLineArguments=neuralart_options,
                                     includeLibraryForSerie=CliLibrarySerie(stm32ai_serie.upper()),
-                                    includeLibraryForIde=CliLibraryIde(stm32ai_ide.lower())))
+                                    includeLibraryForIde=CliLibraryIde(stm32ai_ide.lower())),
+                                    timeout=3600)
 
             if os.path.exists(stm32ai_output):
                 # Move the existing STM32Cube.AI output directory to the output directory
@@ -557,7 +582,10 @@ def stm32ai_deploy_stm32n6(target: bool = False,
                 stm32ai_output = os.path.join(output_dir, "generated")
 
                 # Check if STM32Cube.AI was used locally to add the Lib/Inc generation
-                if not os.listdir(stm32ai_output) or ('Lib' or 'Inc') not in os.listdir(stm32ai_output):
+                # Note: cloud generate moves Lib/Inc into stedgeai-lib/, so check for that too
+                listing = os.listdir(stm32ai_output)
+                has_libs = 'stedgeai-lib' in listing or 'Lib' in listing or 'Inc' in listing
+                if not listing or not has_libs:
                     _stmaic_local_call(session)
         else:
             _stmaic_local_call(session)

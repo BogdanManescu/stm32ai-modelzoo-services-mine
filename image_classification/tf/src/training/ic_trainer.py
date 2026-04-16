@@ -10,16 +10,15 @@
 
 # Import necessary libraries
 import os
-import sys
+
 from timeit import default_timer as timer
 from datetime import timedelta
-from typing import Tuple, List, Dict, Optional
+from typing import Tuple, List, Dict
 
-import mlflow
+
 from hydra.core.hydra_config import HydraConfig
 from munch import DefaultMunch
 from omegaconf import DictConfig
-import numpy as np 
 import tensorflow as tf
 
 # Suppress TensorFlow warnings to reduce log clutter
@@ -32,10 +31,7 @@ from common.utils import (
     log_to_file, log_last_epoch_history, LRTensorBoard, check_training_determinism,
     model_summary, collect_callback_args, vis_training_curves
 )
-from common.training import (
-    set_frozen_layers, set_dropout_rate, get_optimizer, lr_schedulers,
-    set_all_layers_trainable_parameter
-)
+from common.training import ( get_optimizer, lr_schedulers)
 from image_classification.tf.src.utils import get_loss, change_model_number_of_classes, change_model_input_shape
 from image_classification.tf.src.data_augmentation import DataAugmentationLayer
 
@@ -253,14 +249,14 @@ class ICTrainer:
             log_to_file(self.output_dir, f"Dataset : {self.cfg.dataset.dataset_name}")
 
         # Prepare the model
-        if self.cfg.model:
-            cfm = self.cfg.model
+        cfm = self.cfg.model
+        if cfm.model_path:
+            self.model = change_model_number_of_classes(self.model, self.num_classes)
+            print(f"[INFO] : Initialized model with weights from model file {cfm.model_path}")
+            log_to_file(self.cfg.output_dir, (f"Weights from model file : {cfm.model_path}"))
+        elif cfm.model_name:
             print(f"[INFO] : Using `{cfm.model_name}` model")
             log_to_file(self.cfg.output_dir, (f"Model name : {cfm.model_name}"))
-        elif self.cfg.model.model_path:
-            self.model = change_model_number_of_classes(self.model, self.num_classes)
-            print(f"[INFO] : Initialized model with weights from model file {self.cfg.model.model_path}")
-            log_to_file(self.cfg.output_dir, (f"Weights from model file : {self.cfg.model.model_path}"))
 
         # Add preprocessing layers if not resuming training
         if self.cfg.training.resume_training:

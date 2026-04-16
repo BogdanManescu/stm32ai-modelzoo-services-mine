@@ -76,7 +76,7 @@ class LoginService:
         return token
 
     def login(self, username, password) -> str:
-        for i in range(5):
+        for i in range(3):
             try:
                 self._login(username, password)
                 return self.auth_token
@@ -85,7 +85,7 @@ class LoginService:
             except BlockedAccountException as e:
                 raise e
             except Exception as e:
-                print('Login issue, retry (' + str(i+1) + '/5)')
+                print(f'[WARN] : Login issue [{type(e).__name__}: {e}], retry ({str(i+1)}/3)')
                 time.sleep(5)
 
 
@@ -176,7 +176,6 @@ class LoginService:
         auth_code = redirect_params['code'][0]
 
         # Get tokens with POST endpoint
-
         resp = s.post(
             url=get_user_service_ep() + '/login/callback',
             data={
@@ -189,7 +188,8 @@ class LoginService:
         )
 
         # Response should be 200
-        assert (resp.status_code == 200)
+        if resp.status_code != 200:
+            raise Exception(f"[ERROR] : Login callback failed with HTTP {resp.status_code}: {resp.text[:200]}")
 
         # Token is stored in response as JSON
         try:

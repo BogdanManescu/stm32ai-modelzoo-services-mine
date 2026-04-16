@@ -72,7 +72,7 @@ deployment:
     board: B-U585I-IOT02A
   unknown_class_threshold: 0.0 # Threshold used for OOD detection. Mutually exclusive with use_garbage_class
                                # Set to 0 to disable. To enable, set to any float between 0 and 1.
-  build_conf: Debug
+  build_conf: debug
 
 mlflow:
   uri: ./tf/src/experiments_outputs/mlruns

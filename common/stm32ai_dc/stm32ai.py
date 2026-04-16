@@ -22,8 +22,8 @@ class Stm32Ai(Stm32AiBackend):
     def analyze(self, options: CliParameters) -> AnalyzeResult:
         return self.backend.analyze(options)
 
-    def generate(self, options: CliParameters) -> GenerateResult:
-        return self.backend.generate(options)
+    def generate(self, options: CliParameters, timeout = 300) -> GenerateResult:
+        return self.backend.generate(options, timeout)
 
     def validate(self, options: CliParameters) -> ValidateResult:
         return self.backend.validate(options)

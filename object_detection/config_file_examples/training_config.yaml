@@ -21,10 +21,11 @@ dataset:
   exclude_unlabeled: true
   download_data: false
   max_detections: 20
-  data_dir: ./local/data/od_coco_2017_person/train
-  training_path: /local/data/od_coco_2017_person/train
+  train_images_path: /local/data/mini_od_person/tfs/train/images
+  train_annotations_path: /local/data/mini_od_person/tfs/train/annotations
+  val_images_path: /local/data/mini_od_person/tfs/test/images
+  val_annotations_path: /local/data/mini_od_person/tfs/test/annotations
   validation_split: 0.1
-  test_path: /local/data/od_coco_2017_person/test
 
 preprocessing:
   rescaling:

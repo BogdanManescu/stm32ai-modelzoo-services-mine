@@ -14,7 +14,7 @@ import tensorflow as tf
 
 from common.utils import LRTensorBoard, collect_callback_args
 from common.training import lr_schedulers
-from object_detection.tf.src.utils import calculate_objdet_metrics
+from object_detection.tf.src.utils import calculate_objdet_metrics, change_model_input_shape
 
 
 class _ObjectDetectionMetrics(tf.keras.callbacks.Callback):
@@ -43,19 +43,89 @@ class _ObjectDetectionMetrics(tf.keras.callbacks.Callback):
     def on_test_batch_end(self, batch, logs=None):
         self.model.set_tmp_metrics_data(batch)
 
-class SaveBaseModelWithWeightsCallback(tf.keras.callbacks.Callback):
+class _SaveLastBaseModelCallback(tf.keras.callbacks.Callback):
     """
-    Custom callback to save the base_model as a full Keras model when a new best is found.
+        Save a full Keras model and optimizer state at epoch end.
+
+        Behavior:
+        - Supports both ``last`` and ``best`` artifacts through constructor options.
+        - Copies wrapper weights into ``base_model`` when provided, then saves that
+            model to keep a fixed input shape for downstream resume/inference.
+        - Optionally enforces ``model_input_shape`` before saving.
+        - Persists optimizer variables to ``*.npz`` so OD resume can restore
+            optimizer state in the wrapper training model.
     """
-    def __init__(self, base_model, save_path, filepath=None):
+
+    def __init__(self,
+                 saved_models_dir,
+                 base_model=None,
+                 model_input_shape=None,
+                 model_filename="last_model.keras",
+                 optimizer_filename="last_optimizer.npz",
+                 save_best_only=False,
+                 monitor="val_loss",
+                 mode="min"):
         super().__init__()
+        self.saved_models_dir = saved_models_dir
         self.base_model = base_model
-        self.save_path = save_path
-        self.filepath = filepath
-        
+        self.model_input_shape = tuple(model_input_shape) if model_input_shape is not None else None
+        self.model_filename = model_filename
+        self.optimizer_filename = optimizer_filename
+        self.save_best_only = save_best_only
+        self.monitor = monitor
+        self.mode = mode
+        self.best = np.inf if mode == "min" else -np.inf
+
+    def _is_improved(self, current):
+        if current is None:
+            return False
+        if self.mode == "min":
+            return current < self.best
+        return current > self.best
+
     def on_epoch_end(self, epoch, logs=None):
-        self.base_model.load_weights(self.filepath)
-        self.base_model.save(self.save_path)
+        logs = logs or {}
+        if self.save_best_only:
+            current = logs.get(self.monitor)
+            if not self._is_improved(current):
+                return
+            self.best = current
+
+        if self.base_model is not None:
+            wrapped_model = getattr(self.model, "model", None)
+            if wrapped_model is not None:
+                self.base_model.set_weights(wrapped_model.get_weights())
+            model_to_save = self.base_model
+        else:
+            get_base = getattr(self.model, 'get_base_model', None)
+            if get_base is not None:
+                model_to_save = get_base()
+            else:
+                model_to_save = getattr(self.model, 'model', self.model)
+
+        # Ensure the saved model keeps the expected static input shape from config.
+        if self.model_input_shape is not None:
+            current_shape = getattr(model_to_save, "input_shape", None)
+            if current_shape is not None and len(current_shape) >= 4:
+                current_shape = tuple(current_shape[1:4])
+            if current_shape != self.model_input_shape:
+                model_to_save, _ = change_model_input_shape(
+                    model_to_save,
+                    (None, self.model_input_shape[0], self.model_input_shape[1], self.model_input_shape[2]),
+                )
+
+        model_dst = os.path.join(self.saved_models_dir, self.model_filename)
+        model_to_save.save(model_dst)
+
+        # Persist optimizer state so training can be resumed with the
+        # correct adaptive-LR accumulators, momentum buffers, etc.
+        optimizer = getattr(self.model, 'optimizer', None)
+        if optimizer is not None and hasattr(optimizer, 'variables'):
+            opt_dst = os.path.join(self.saved_models_dir, self.optimizer_filename)
+            np.savez(opt_dst,
+                     *[v.numpy() for v in optimizer.variables])
+
+
 
 class MultiResCallback(tf.keras.callbacks.Callback):
 
@@ -123,6 +193,7 @@ def _get_best_model_callback(cfg: DictConfig,
 
 def get_callbacks(cfg: DictConfig,
                   base_model: tf.keras.Model = None,
+                  model_input_shape=None,
                   num_classes=None,
                   iou_eval_threshold=None,
                   image_sizes=None,
@@ -218,12 +289,20 @@ def get_callbacks(cfg: DictConfig,
     callback = _get_best_model_callback(cfg, saved_models_dir=saved_models_dir, message=message)
     callback_list.append(callback)
 
-    # Add the custom callback to save the base_model as a full Keras model when a new best is found
-    callback = SaveBaseModelWithWeightsCallback(
+    monitor = "val_loss"
+    mode = "min"
+    if "ModelCheckpoint" in cfg:
+        monitor, mode = _get_callback_monitoring(cfg["ModelCheckpoint"], callback_name="ModelCheckpoint", message=message)
+
+    callback = _SaveLastBaseModelCallback(
+                    saved_models_dir=saved_models_dir,
                     base_model=base_model,
-                    save_path=os.path.join(saved_models_dir, "best_model.keras"),
-                    filepath=os.path.join(saved_models_dir, "best_weights.weights.h5")
-                )
+                    model_input_shape=model_input_shape,
+                    model_filename="best_model.keras",
+                    optimizer_filename="best_optimizer.npz",
+                    save_best_only=True,
+                    monitor=monitor,
+                    mode=mode)
     callback_list.append(callback)
         
     # Add the Keras callback that saves the model at the end of the epoch
@@ -234,12 +313,12 @@ def get_callbacks(cfg: DictConfig,
                     save_freq='epoch')
     callback_list.append(callback)
 
-    # Add the custom callback to save the base_model as a full Keras model at the end of the epoch
-    callback = SaveBaseModelWithWeightsCallback(
+    callback = _SaveLastBaseModelCallback(
+                    saved_models_dir=saved_models_dir,
                     base_model=base_model,
-                    save_path=os.path.join(saved_models_dir, "last_model.keras"),
-                    filepath=os.path.join(saved_models_dir, "last_weights.weights.h5")
-                )
+                    model_input_shape=model_input_shape,
+                    model_filename="last_model.keras",
+                    optimizer_filename="last_optimizer.npz")
     callback_list.append(callback)
     # Add the TensorBoard callback
     callback = LRTensorBoard(log_dir=log_dir)

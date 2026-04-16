@@ -25,11 +25,9 @@ from common.utils import (
     check_training_determinism 
 )
 from common.training import set_frozen_layers, get_optimizer, set_dropout_rate
-from object_detection.tf.src.utils import get_sizes_ratios_ssd_v1, get_sizes_ratios_ssd_v2, \
-                  get_fmap_sizes, get_anchor_boxes, change_yolo_model_number_of_classes, change_yolo_x_model_number_of_classes
+from object_detection.tf.src.utils import change_yolo_model_number_of_classes, change_yolo_x_model_number_of_classes
 from object_detection.tf.src.models import model_family
 from object_detection.tf.src.training.utils.callbacks import get_callbacks
-from object_detection.tf.src.training.utils.ssd.ssd_train_model import SSDTrainingModel
 from object_detection.tf.src.training.utils.yolo.yolo_train_model import YoloTrainingModel
 from object_detection.tf.src.training.utils.yolo.yolo_x_train_model import YoloXTrainingModel
 
@@ -44,7 +42,7 @@ class ODTrainer:
         best_model = trainer.save_and_evaluate()
         # or simply: best_model = trainer.train()
 
-    SSDTrainingModel, YoloTrainingModel and YoloXTrainingModel wraps
+    YoloTrainingModel and YoloXTrainingModel wraps
     base model with preprocessing and data augmentation.
     """
     def __init__(self, cfg: DictConfig, model: tf.keras.Model, dataloaders: Dict[str, tf.data.Dataset]):
@@ -149,50 +147,7 @@ class ODTrainer:
             raise ValueError(f"\nThe model input shape is unspecified. Got {str(model_input_shape)}\n"
                             "Unable to proceed with training.")
         
-        if model_family(self.cfg.model.model_type) == "ssd":
-            # Get the anchor boxes
-            fmap_sizes = get_fmap_sizes(self.cfg.model.model_type, model_input_shape)
-
-            if self.cfg.model.model_type == "st_ssd_mobilenet_v1":
-                anchor_sizes, anchor_ratios = get_sizes_ratios_ssd_v1(model_input_shape)
-            elif self.cfg.model.model_type == "ssd_mobilenet_v2_fpnlite":
-                anchor_sizes, anchor_ratios = get_sizes_ratios_ssd_v2(model_input_shape)
-
-            anchor_boxes = get_anchor_boxes(
-                                fmap_sizes,
-                                model_input_shape[:2],
-                                sizes=anchor_sizes,
-                                ratios=anchor_ratios,
-                                normalize=True,
-                                clip_boxes=False)
-            
-            # Concatenate scores, boxes and anchors
-            # to get a model suitable for training
-            tmoutput = tf.keras.layers.Concatenate(axis=2, name='predictions')(self.base_model.outputs)
-            train_model = tf.keras.models.Model(inputs=self.base_model.input, outputs=tmoutput)
-
-            data_augmentation_cfg = self.cfg.data_augmentation.config if self.cfg.data_augmentation else None
-            num_anchors = np.shape(anchor_boxes)[0]
-            cpp = self.cfg.postprocessing
-            self.train_model = SSDTrainingModel(
-                                train_model,
-                                num_classes=len(self.class_names),
-                                num_anchors=num_anchors,
-                                num_labels=num_labels,
-                                num_detections=anchor_boxes.shape[0],
-                                val_dataset_size=val_dataset_size,
-                                batch_size=batch_size,
-                                anchor_boxes=anchor_boxes,
-                                data_augmentation_cfg=data_augmentation_cfg,
-                                pixels_range=pixels_range,
-                                image_size=model_input_shape[:2],
-                                pos_iou_threshold=0.5,
-                                neg_iou_threshold=0.3,
-                                max_detection_boxes=cpp.max_detection_boxes,
-                                nms_score_threshold=cpp.confidence_thresh,
-                                nms_iou_threshold=cpp.NMS_thresh,
-                                metrics_iou_threshold=cpp.IoU_eval_thresh)
-        elif model_family(self.cfg.model.model_type) == "yolo":
+        if model_family(self.cfg.model.model_type) == "yolo":
             cpp = self.cfg.postprocessing
 
             print("Using Yolo anchors:")
@@ -249,6 +204,8 @@ class ODTrainer:
                                 metrics_iou_threshold=cpp.IoU_eval_thresh)
 
         self.train_model.compile(optimizer=get_optimizer(self.cfg.training.optimizer))
+        if self.cfg.training.resume_training:
+            self._restore_optimizer_state()
         
         # If multi-resolution is used, we need to check that the
         # random image sizes are compatible with the network stride.
@@ -271,6 +228,7 @@ class ODTrainer:
         self.callbacks = get_callbacks(
                     cfg=self.cfg.training.callbacks,
                     base_model=self.base_model,
+                    model_input_shape=self.cfg.model.input_shape,
                     num_classes=self.num_classes,
                     iou_eval_threshold=self.cfg.postprocessing.IoU_eval_thresh,
                     image_sizes=image_sizes,
@@ -291,6 +249,44 @@ class ODTrainer:
             if not check_training_determinism(self.train_model, sample):
                 print("[WARNING] Some ops are not deterministic, disabling determinism.")
                 tf.config.experimental.enable_op_determinism.__globals__['_pywrap_determinism'].enable(False)
+
+    def _restore_optimizer_state(self):
+        """
+        Restore optimizer state for resume training from ``last_optimizer.npz``.
+
+        The state file is expected next to ``cfg.model.model_path`` and is loaded
+        into the wrapper optimizer attached to ``self.train_model``.
+        Restoration is best-effort: if the file is missing, variable counts do not
+        match, or variable shapes differ, training continues with a fresh optimizer
+        state.
+        """
+        model_dir = os.path.dirname(os.path.abspath(self.cfg.model.model_path))
+        opt_path = os.path.join(model_dir, "last_optimizer.npz")
+        if not os.path.isfile(opt_path):
+            print(f"[WARNING] : Resume training enabled but {opt_path} was not found. Using a fresh optimizer state.")
+            return
+
+        try:
+            self.train_model.optimizer.build(self.train_model.trainable_weights)
+            with np.load(opt_path) as data:
+                opt_vars = list(self.train_model.optimizer.variables)
+                saved_keys = sorted(data.files, key=lambda x: int(x.replace('arr_', '')))
+
+                if len(opt_vars) != len(saved_keys):
+                    print(f"[WARNING] : Optimizer variable count mismatch (current={len(opt_vars)}, saved={len(saved_keys)}). Using a fresh optimizer state.")
+                    return
+
+                for var, key in zip(opt_vars, saved_keys):
+                    if tuple(var.shape) != tuple(data[key].shape):
+                        print(f"[WARNING] : Optimizer shape mismatch for {var.name} (current={tuple(var.shape)}, saved={tuple(data[key].shape)}). Using a fresh optimizer state.")
+                        return
+
+                for var, key in zip(opt_vars, saved_keys):
+                    var.assign(data[key])
+
+            print(f"[INFO] : Restored optimizer state from {opt_path}")
+        except Exception as err:
+            print(f"[WARNING] : Failed to restore optimizer state from {opt_path}. Using fresh optimizer state. Error: {err}")
 
     def fit(self):
         """
@@ -317,8 +313,6 @@ class ODTrainer:
         avg_time = round(fit_run_time / (int(last_epoch) + 1), 2)
         print("Training runtime:", str(timedelta(seconds=fit_run_time)))
         log_to_file(self.output_dir, f"Training runtime : {fit_run_time} s\nAverage time per epoch : {avg_time} s")
-        if self.cfg.general.display_figures:
-            vis_training_curves(history=self.history, output_dir=self.output_dir)
 
     def save(self):
         """

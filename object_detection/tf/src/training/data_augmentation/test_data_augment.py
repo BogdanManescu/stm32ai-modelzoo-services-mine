@@ -18,20 +18,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))))
+print(ROOT_DIR)
+sys.path.append(ROOT_DIR)
 
-SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-sys.path.append(os.path.dirname(SCRIPT_DIR))
-
+from api import get_dataloaders
 from common.data_augmentation import remap_pixel_values_range
 from common.utils import postprocess_config_dict
 from object_detection.tf.src.data_augmentation import data_augmentation
 from object_detection.tf.src.utils import plot_bounding_boxes, parse_data_augmentation_section, parse_preprocessing_section, parse_dataset_section
-from object_detection.tf.src.preprocessing import get_training_data_loaders
-
 
 
 def plot_image_and_labels(image: np.array, labels: np.array,
-                          image_aug: np.array, labels_aug: np.array) -> None:
+                          image_aug: np.array, labels_aug: np.array,
+                          save_dir: str = None, filename: str = None) -> None:
     """
     Displays side by side the original and augmented image
     with their groundtruth bounding boxes.
@@ -51,7 +51,11 @@ def plot_image_and_labels(image: np.array, labels: np.array,
             A numpy array with shape [num_labels, 5]
         class_names:
             A list of strings, the class names.
-            
+        save_dir:
+            Optional directory to save the figure to.
+        filename:
+            Optional filename for saving the figure.
+
     Returns:
         None
     """
@@ -67,7 +71,7 @@ def plot_image_and_labels(image: np.array, labels: np.array,
         x_size = round((image_height / image_width) * display_size)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(x_size, y_size))
-    
+
     # Sample box colors
     num_boxes = np.shape(labels)[0]
     colors = []
@@ -82,15 +86,20 @@ def plot_image_and_labels(image: np.array, labels: np.array,
     plot_bounding_boxes(ax2, labels_aug[:, 1:], colors=colors)
     ax2.title.set_text("Augmented")
 
-    plt.show()
+    plt.tight_layout()
+    if save_dir and filename:
+        os.makedirs(save_dir, exist_ok=True)
+        fig.savefig(os.path.join(save_dir, filename), dpi=150, bbox_inches="tight")
+    else:
+        plt.show()
     plt.close()
-    
 
-def test_data_augmentation(config_file_path: str, seed_arg: str = None) -> None:
+
+def test_data_augmentation(config_file_path: str, seed_arg: str = None, output_dir: str = None) -> None:
     """
-    Samples a batch of images with their groundtruth labels from 
+    Samples a batch of images with their groundtruth labels from
     the training set, applies to them the data augmentation functions
-    specified in the YAML configuration file, and displays side by side 
+    specified in the YAML configuration file, and displays side by side
     the original images and augmented images with their groundtruth
     bounding boxes.
 
@@ -104,7 +113,7 @@ def test_data_augmentation(config_file_path: str, seed_arg: str = None) -> None:
     Returns:
         None
     """
-    
+
     # If the `seed` argument of the script was not used,
     # random generators are not seeded.
     if seed_arg:
@@ -125,13 +134,22 @@ def test_data_augmentation(config_file_path: str, seed_arg: str = None) -> None:
         raise ValueError("\nPlease set `operation_mode` to 'training' to run this script.")
 
     # Parse the needed config file sections
-    mode_groups = DefaultMunch.fromDict({"training": ["training"]})
+    mode_groups = DefaultMunch.fromDict({
+        "training": ["training", "chain_tqeb", "chain_tqe"],
+        "evaluation": ["evaluation", "chain_tqeb", "chain_tqe", "chain_eqe", "chain_eqeb"],
+        "quantization": ["quantization", "chain_tqeb", "chain_tqe", "chain_eqe",
+                         "chain_qb", "chain_eqeb", "chain_qd"],
+        "benchmarking": ["benchmarking", "chain_tqeb", "chain_qb", "chain_eqeb"],
+        "deployment": ["deployment", "chain_qd"],
+        "prediction": ["prediction"],
+        "compression": ["compression"]
+    })
     parse_dataset_section(cfg.dataset, "training", mode_groups)
     parse_preprocessing_section(cfg.preprocessing, mode="training")
     parse_data_augmentation_section(cfg)
-    
-    if not os.path.isabs(cfg.dataset.training_path):
-        cfg.dataset.training_path = os.path.join("../../", cfg.dataset.training_path)
+
+    if not os.path.isabs(cfg.dataset.train_images_path):
+        cfg.dataset.train_images_path = os.path.join("../../", cfg.dataset.train_images_path)
 
     cpp = cfg.preprocessing.rescaling
     pixels_range = (cpp.offset, 255*cpp.scale + cpp.offset)
@@ -140,30 +158,34 @@ def test_data_augmentation(config_file_path: str, seed_arg: str = None) -> None:
     # different images will be sampled every time
     # the script is run.
     seed = seed_arg if seed_arg else None
-        
+
     # Create a data loader to get examples from the training set
-    print("Dataset:", cfg.dataset.training_path)    
+    print("Dataset path:", cfg.dataset.train_images_path)
+    print("Dataset name:", cfg.dataset.dataset_name)
+    print("Dataset format:", cfg.dataset.format)
     print("Sampling seed:", seed)
-    
-    data_loader, _ = get_training_data_loaders(
-                            cfg,
-                            train_batch_size=4,
-                            normalize=False, 
-                            seed=seed,
-                            verbose=False)
+
+    cfg.use_case = "object_detection"
+    cfg.model.framework = "tf"
+    data_loader = get_dataloaders(cfg)
 
     if "random_periodic_resizing" in cfg.data_augmentation.config:
         print("[INFO] : Ignoring random_periodic_resizing function")
         del cfg.data_augmentation.config.random_periodic_resizing
-    
+
     augmentation_functions = list(cfg.data_augmentation.config.keys())
     if len(augmentation_functions) == 0:
         print("No data augmentation functions to test. Exiting script...")
         exit()
 
-    print("Use ctrl+c to exit the script")
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"Saving augmentation images to: {output_dir}")
+    else:
+        print("Use ctrl+c to exit the script")
 
-    for data in data_loader:
+    img_counter = 0
+    for data in data_loader['train']:
         images = data[0]
         labels = data[1]
         batch_size = tf.shape(images)[0]
@@ -174,15 +196,22 @@ def test_data_augmentation(config_file_path: str, seed_arg: str = None) -> None:
                                 cfg.data_augmentation.config,
                                 pixels_range=pixels_range)
 
-        # Map pixels values to the [0, 1] interval 
+        # Map pixels values to the [0, 1] interval
         # to get correct displays in matplotlib
         images = remap_pixel_values_range(images, pixels_range, (0, 1))
         images_aug = remap_pixel_values_range(images_aug, pixels_range, (0, 1))
 
         # Plot the images and their groundtruth labels
         for i in range(batch_size):
-            plot_image_and_labels(images[i], labels[i], 
-                                  images_aug[i], labels_aug[i])
+            if output_dir:
+                filename = f"augmentation_{img_counter:04d}.png"
+                plot_image_and_labels(images[i], labels[i],
+                                      images_aug[i], labels_aug[i],
+                                      save_dir=output_dir, filename=filename)
+                img_counter += 1
+            else:
+                plot_image_and_labels(images[i], labels[i],
+                                      images_aug[i], labels_aug[i])
 
 
 def main():
@@ -194,7 +223,9 @@ def main():
     parser.add_argument("--seed", type=str, default="",
                         help="Seed for the random generators used to sample the dataset. " + \
                         "By default, samples will be different every time the script is run.")
-    
+    parser.add_argument("--output_dir", type=str, default=None,
+                        help="Optional directory to save augmentation images (default: display only)")
+
     args = parser.parse_args()
 
     if not os.path.isfile(Path(args.config_file)):
@@ -208,7 +239,7 @@ def main():
     else:
         seed = None
 
-    test_data_augmentation(Path(args.config_file), seed_arg=seed)
+    test_data_augmentation(Path(args.config_file), seed_arg=seed, output_dir=args.output_dir)
 
 if __name__ == '__main__':
     main()

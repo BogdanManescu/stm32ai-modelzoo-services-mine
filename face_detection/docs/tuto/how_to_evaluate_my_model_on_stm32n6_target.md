@@ -11,24 +11,24 @@ The evaluation on the target requires installation and configuration of STEdgeAI
 - [STEdgeAI Core](https://www.st.com/en/development-tools/stedgeai-core.html)
 - [STM32CubeIDE](https://www.st.com/en/development-tools/stm32cubeide.html)
 
-A few configurations are required, please find below an example following a standard installation of STEdgeAI_Core v3.x.
+A few configurations are required, please find below an example following a standard installation of STEdgeAI_Core v4.x.
 
-- The 'C:/ST/STEdgeAI_Core/3.x/scripts/N6_scripts/config_n6l.json' file should be updated to configure the N6 loader.
+- The 'C:/ST/STEdgeAI_Core/4.x/scripts/N6_scripts/config_n6l.json' file should be updated to configure the N6 loader.
 ```json
 {
 	// The 2lines below are _only used if you call n6_loader.py ALONE (memdump is optional and will be the parent dir of network.c by default)
-	"network.c": "C:/ST/STEdgeAI_Core/3.0/script/N6_scripts/st_ai_output/network.c",
+	"network.c": "C:/ST/STEdgeAI_Core/4.0/script/N6_scripts/st_ai_output/network.c",
 	//"memdump_path": "C:/Users/foobar/CODE/stm.ai/stm32ai_output",
 	// Location of the "validation" project  + build config name to be built (if applicable)
 	// If using the provided project, valid build_conf names are "N6-DK" (CR5 boards), "N6-DK-legacy" (older-than-CR5-boards); "N6-Nucleo" can also be used for IAR project.
-	"project_path": "C:/ST/STEdgeAI_Core/3.0/Projects/STM32N6570-DK/Applications/NPU_Validation",
+	"project_path": "C:/ST/STEdgeAI_Core/4.0/Projects/STM32N6570-DK/Applications/NPU_Validation",
 	"project_build_conf": "N6-DK",
 	// Skip programming weights to earn time (but lose accuracy) -- useful for performance tests
 	"skip_external_flash_programming": false,
 	"skip_ram_data_programming": false
 }
 ```
-- The 'C:/ST/STEdgeAI_Core/3.x/scripts/N6_scripts/config.json' file should be updated to indicate the paths to find the external tools.
+- The 'C:/ST/STEdgeAI_Core/4.x/scripts/N6_scripts/config.json' file should be updated to indicate the paths to find the external tools.
 ```json
 {
 	// Set Compiler_type to either gcc or iar
@@ -103,7 +103,7 @@ postprocessing:
 
 tools:
    stedgeai:
-      path_to_stedgeai: C:/ST/STEdgeAI/3.0/Utilities/windows/stedgeai.exe
+      path_to_stedgeai: C:/ST/STEdgeAI/4.0/Utilities/windows/stedgeai.exe
 
 mlflow:
   uri: ./tf/src/experiments_outputs/mlruns

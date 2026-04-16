@@ -26,9 +26,6 @@ dataset:
   train_annotations_path: /local/data/OD_datasets/COCO/annotations/person_keypoints_train2017.json
   val_images_path: /local/data/OD_datasets/COCO/val2017
   val_annotations_path: /local/data/OD_datasets/COCO/annotations/person_keypoints_val2017.json
-  training_path: ./datasets/COCO_2017_person/tmp/coco_like/train
-  validation_split: 0.1
-  test_path: ./datasets/COCO_2017_person/tmp/coco_like/test
   quantization_path: /local/data/od_coco_2017_person/train
   quantization_split: 0.001
 

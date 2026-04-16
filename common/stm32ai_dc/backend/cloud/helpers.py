@@ -56,10 +56,13 @@ def _get_env_proxy():
     proxy_config = {}
     http_proxy = os.environ.get('http_proxy') or os.environ.get('HTTP_PROXY')
     https_proxy = os.environ.get('https_proxy') or os.environ.get('HTTPS_PROXY')
+    no_proxy = os.environ.get('no_proxy') or os.environ.get('NO_PROXY') or ''
     if http_proxy != None:
-        proxy_config['http_proxy'] = http_proxy
+        proxy_config['http'] = http_proxy
     if https_proxy != None:
-        proxy_config['https_proxy'] = https_proxy
+        proxy_config['https'] = https_proxy
+    if no_proxy:
+        proxy_config['no_proxy'] = no_proxy
     proxy_config = proxy_config if len(proxy_config) else None
     return proxy_config
 
@@ -120,8 +123,16 @@ def send_post(
     return resp
 
 def get_supported_versions():
-    resp = requests.get(
-        get_supported_versions_ep(),
-        verify=get_ssl_verify_status(),
-        proxies=_get_env_proxy())
-    return resp.json()
+    try:
+        url = get_supported_versions_ep()
+        resp = requests.get(
+            url,
+            verify=get_ssl_verify_status(),
+            proxies=_get_env_proxy())
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.SSLError:
+        raise
+    except Exception as e:
+        print(f'[WARN] : Could not fetch supported versions from Developer Cloud ({type(e).__name__}: {e}). Version compatibility check skipped.')
+        return []

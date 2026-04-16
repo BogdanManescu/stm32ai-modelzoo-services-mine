@@ -93,7 +93,8 @@ evaluation:
 dataset:
   dataset_name: coco
   class_names: [person]
-  test_path: ./datasets/coco_2017_person/test
+  test_images_path: ./datasets/coco_2017_person/test
+  test_annotations_path: ./datasets/coco_2017_person/test
 
 
 preprocessing:

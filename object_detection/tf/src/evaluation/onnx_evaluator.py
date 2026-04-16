@@ -9,9 +9,6 @@
 #  *--------------------------------------------------------------------------------------------*/
 
 import os
-import sys
-import torch
-import cv2
 import numpy as np
 import tqdm
 import mlflow
@@ -24,7 +21,6 @@ from omegaconf import DictConfig
 from timeit import default_timer as timer
 from datetime import timedelta
 from tabulate import tabulate
-from pathlib import Path
 
 from object_detection.tf.src.postprocessing import get_detections, generate_ssd_priors,convert_locations_to_boxes
 from object_detection.tf.src.models import model_family

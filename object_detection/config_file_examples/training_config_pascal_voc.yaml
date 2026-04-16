@@ -20,13 +20,15 @@ dataset:
   dataset_name: pascal_voc
   exclude_unlabeled: true
   download_data: false
-  max_detections: 20
-  data_dir: ./datasets/pascal_voc/tmp/
-  train_images_path: /local/datasets/VOC0712/JPEGImages/
-  train_xml_dir: /local/datasets/VOC0712/Annotations #!!!
-  training_path: ./datasets/pascal_voc/tmp/train
-  validation_split: 0.1
-  test_path: ./datasets/pascal_voc/tmp/test
+  # Required training split
+  train_images_path: /local/data/mini_od_person/pascal_voc/JPEGImages
+  train_annotations_path: /local/data/mini_od_person/pascal_voc/Annotations/
+  train_split:  /local/data/mini_od_person/pascal_voc/ImageSets/Main/train.txt
+  # Optional validation split
+  val_images_path: /local/data/mini_od_person/pascal_voc/JPEGImages         # usually same as train_images_path
+  val_annotations_path: /local/data/mini_od_person/pascal_voc/Annotations/  # usually same as train_annotations_path
+  val_split:  /local/data/mini_od_person/pascal_voc/ImageSets/Main/val.txt
+  #validation_split: 0.2
 
 preprocessing:
   rescaling:

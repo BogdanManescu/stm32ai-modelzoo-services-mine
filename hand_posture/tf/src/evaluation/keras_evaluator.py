@@ -10,7 +10,6 @@
 # Import necessary libraries
 import os
 import warnings
-import mlflow
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
 
@@ -18,6 +17,7 @@ from omegaconf import DictConfig
 warnings.filterwarnings("ignore")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
+import mlflow
 
 # Import utility functions
 from hand_posture.tf.src.utils import get_loss

@@ -7,17 +7,13 @@
 #  * If no LICENSE file comes with this software, it is provided AS-IS.
 #  *--------------------------------------------------------------------------------------------*/
 
-import sys
 import os
 import tqdm
-import mlflow
 import numpy as np
 import tensorflow as tf
-import onnx
-import onnxruntime
+import mlflow
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
-from typing import Optional
 
 from common.utils import log_to_file, ai_runner_interp, ai_interp_input_quant, ai_interp_outputs_dequant
 from common.evaluation import model_is_quantized
@@ -80,12 +76,16 @@ class ONNXModelEvaluator:
         else:
             self.eval_ds = self.valid_ds
         inputs = self.model.get_inputs()
+        input_shape = self.model.get_inputs()[0].shape  # e.g. [batch, channels, height, width] or similar
+        model_batch_size = input_shape[0]
         outputs = self.model.get_outputs()
         metric = 0
         nb_images = 0
         predictions_all = []
         images_full = []
         tp = None
+
+
         for images, labels in tqdm.tqdm(self.eval_ds):
             # Here we consider that the dataloader provided chlast uint8 data by default.
             # If the user declares that input will be chfirst, a transpose of the input is needed else
@@ -95,18 +95,35 @@ class ONNXModelEvaluator:
                 images = np.transpose(images, [0,3,1,2])
             else:
                 images = tf.cast(images, dtype=tf.float32).numpy()
+            
+            if model_batch_size!=1:
+                if target == 'host':
+                    predictions = self.model.run([o.name for o in outputs], {inputs[0].name: images.astype('float32')})[0]
+                elif target in ['stedgeai_host', 'stedgeai_n6', 'stedgeai_h7p']:
+                    data = ai_interp_input_quant(ai_runner_interpreter, images, '.onnx')
+                    predictions = ai_runner_invoke(data, ai_runner_interpreter)
+                    predictions = ai_interp_outputs_dequant(ai_runner_interpreter, predictions)[0]
 
-            if target == 'host':
-                predictions = self.model.run([o.name for o in outputs], {inputs[0].name: images.astype('float32')})[0]
-            elif target in ['stedgeai_host', 'stedgeai_n6', 'stedgeai_h7p']:
-                data = ai_interp_input_quant(ai_runner_interpreter, images, '.onnx')
-                predictions = ai_runner_invoke(data, ai_runner_interpreter)
-                predictions = ai_interp_outputs_dequant(ai_runner_interpreter, predictions)[0]
+                # Here we consider that the post processing is always expecting chlast data
+                # If the user declares that output will be chfirst, a transpose of the output is needed else
+                # the compiler will have added a transpose in the onnx model
+            else:
+                if target == 'host':
+                    predictions = []
+                    for i in range(images.shape[0]):
+                        pred = self.model.run([o.name for o in outputs], {inputs[0].name: images[i:i+1].astype('float32')})[0]
+                        predictions.append(pred)
+                    predictions = np.concatenate(predictions, axis=0)
+                elif target in ['stedgeai_host', 'stedgeai_n6', 'stedgeai_h7p']:
+                    predictions = []
+                    for i in range(images.shape[0]):
+                        data = ai_interp_input_quant(ai_runner_interpreter, images[i:i+1], '.onnx')
+                        pred = ai_runner_invoke(data, ai_runner_interpreter)
+                        pred = ai_interp_outputs_dequant(ai_runner_interpreter, pred)[0]
+                        predictions.append(pred)
+                    predictions = np.concatenate(predictions, axis=0)
 
-            # Here we consider that the post processing is always expecting chlast data
-            # If the user declares that output will be chfirst, a transpose of the output is needed else
-            # the compiler will have added a transpose in the onnx model
-            if self.cfg.evaluation.output_chpos=="chfirst" or target == 'host':
+            if (target == 'host') and self.cfg.model.model_type not in ["yolo_mpe"]:
                 # Make the transpose chfirst -> chlast
                 if len(predictions.shape)==3:
                     predictions = tf.transpose(predictions,[0,2,1])

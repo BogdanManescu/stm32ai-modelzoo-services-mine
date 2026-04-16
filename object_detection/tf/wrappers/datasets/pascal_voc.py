@@ -20,9 +20,9 @@ def get_pascal_voc(cfg):
     args = prepare_kwargs_for_dataloader(cfg)
     
     # Add possibility to download the dataset here?
-    if args['data_download'] and args['data_dir'] and args['training_path'] == None and\
+    if args['data_download'] and args['data_dir'] and args['train_images_path'] == None and\
         cfg.operation_mode in ['training', 'chain_tqe', 'chain_tqeb']:
-        args['training_path'] = download_dataset(data_root=args['data_dir'],
+        args['train_images_path'] = download_dataset(data_root=args['data_dir'],
                          dataset_name='pascal_voc')
 
     # Creates datasets

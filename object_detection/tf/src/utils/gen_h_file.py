@@ -19,7 +19,6 @@ import tensorflow as tf
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
 from common.utils import aspect_ratio_dict, color_mode_n6_dict
-from object_detection.tf.src.postprocessing.tflite_ssd_postprocessing_removal.ssd_model_cut_function import ssd_post_processing_removal
 
 
 
@@ -66,34 +65,10 @@ def gen_h_user_file_h7(config: DictConfig = None, quantized_model_path: str = No
         os.mkdir(path)
     except OSError as error:
         print(error)
-
-    TFLite_Detection_PostProcess_id = False
     XY, WH = None, None
 
-    if params.model.model_type == "st_ssd_mobilenet_v1":
-        classes = '{\\\n"background",'
 
-    elif params.model.model_type =="ssd_mobilenet_v2_fpnlite":
-
-        name_of_post_process_layer='TFLite_Detection_PostProcess'
-
-        for op in interpreter_quant._get_ops_details():
-            if op['op_name'] == name_of_post_process_layer:
-                TFLite_Detection_PostProcess_id = op['index']
-
-
-        if TFLite_Detection_PostProcess_id:
-            print('[INFO] : This TFLITE model contains a post-processing layer')
-            anchors_path = os.path.join(path,'anchors.h')
-            path_cut_model, XY, WH = ssd_post_processing_removal(quantized_model_path, TFLite_Detection_PostProcess_id, anchors_path)
-            quantized_model_path = path_cut_model
-        else:
-            print('[INFO] : This TFLITE model doesnt contain a post-processing layer')
-
-        classes = '{\\\n"background",'
-
-    else:
-        classes = '{\\\n'
+    classes = '{\\\n'
 
     for i, x in enumerate(params.dataset.class_names):
         if i == (len(class_names) - 1):
@@ -125,10 +100,7 @@ def gen_h_user_file_h7(config: DictConfig = None, quantized_model_path: str = No
         f.write("#ifndef __AI_MODEL_CONFIG_H__\n")
         f.write("#define __AI_MODEL_CONFIG_H__\n\n\n")
         f.write("/* I/O configuration */\n")
-        if params.model.model_type == "st_ssd_mobilenet_v1" or params.model.model_type == "ssd_mobilenet_v2_fpnlite":
-            f.write("#define NB_CLASSES        ({})\n".format(len(class_names)+1))
-        else:
-            f.write("#define NB_CLASSES        ({})\n".format(len(class_names)))
+        f.write("#define NB_CLASSES        ({})\n".format(len(class_names)))
         f.write("#define INPUT_HEIGHT      ({})\n".format(int(input_shape[1])))
         f.write("#define INPUT_WIDTH       ({})\n".format(int(input_shape[2])))
         f.write("#define INPUT_CHANNELS    ({})\n".format(int(input_shape[3])))
@@ -155,11 +127,8 @@ def gen_h_user_file_h7(config: DictConfig = None, quantized_model_path: str = No
         f.write("#define POSTPROCESS_SSD        (4)\n")
         f.write("#define POSTPROCESS_ST_YOLO_X  (5)\n\n")
 
-        if (params.model.model_type == "st_ssd_mobilenet_v1" or params.model.model_type == "ssd_mobilenet_v2_fpnlite") and not TFLite_Detection_PostProcess_id:
-            f.write("#define POSTPROCESS_TYPE    POSTPROCESS_ST_SSD\n\n")
-        elif TFLite_Detection_PostProcess_id:
-            f.write("#define POSTPROCESS_TYPE    POSTPROCESS_SSD\n\n")
-        elif params.model.model_type == "CENTER_NET":
+
+        if params.model.model_type == "CENTER_NET":
             f.write("#define POSTPROCESS_TYPE    POSTPROCESS_CENTER_NET\n\n")
         elif (params.model.model_type == "yolov2t" or params.model.model_type =="st_yololcv1"):
             f.write("#define POSTPROCESS_TYPE    POSTPROCESS_YOLO_V2\n\n")
@@ -168,23 +137,7 @@ def gen_h_user_file_h7(config: DictConfig = None, quantized_model_path: str = No
         else:
             raise TypeError("please select one of this supported post processing options [CENTER_NET,st_yoloxn, st_yololcv1, yolov2t, st_ssd_mobilenet_v1, ssd_mobilenet_v2_fpnlite ]")
 
-        if (params.model.model_type == "st_ssd_mobilenet_v1" or params.model.model_type == "ssd_mobilenet_v2_fpnlite") and not TFLite_Detection_PostProcess_id:
-            f.write("/* Postprocessing ST_SSD configuration */\n")
-            f.write("#define AI_OBJDETECT_SSD_ST_PP_NB_CLASSES         ({})\n".format(len(class_names)+1))
-            f.write("#define AI_OBJDETECT_SSD_ST_PP_IOU_THRESHOLD      ({})\n".format(float(params.postprocessing.NMS_thresh)))
-            f.write("#define AI_OBJDETECT_SSD_ST_PP_CONF_THRESHOLD     ({})\n".format(float(params.postprocessing.confidence_thresh)))
-            f.write("#define AI_OBJDETECT_SSD_ST_PP_MAX_BOXES_LIMIT    ({})\n".format(int(params.postprocessing.max_detection_boxes)))
-            f.write("#define AI_OBJDETECT_SSD_ST_PP_TOTAL_DETECTIONS   ({})\n".format(int(output_details['shape'][1])))
-        elif  TFLite_Detection_PostProcess_id:
-            f.write("\n/* Postprocessing SSD configuration */\n")
-            f.write("#define AI_OBJDETECT_SSD_PP_XY_SCALE           ({})\n".format(XY))
-            f.write("#define AI_OBJDETECT_SSD_PP_WH_SCALE           ({})\n".format(WH))
-            f.write("#define AI_OBJDETECT_SSD_PP_NB_CLASSES         ({})\n".format(len(class_names)+1))
-            f.write("#define AI_OBJDETECT_SSD_PP_IOU_THRESHOLD      ({})\n".format(float(params.postprocessing.NMS_thresh)))
-            f.write("#define AI_OBJDETECT_SSD_PP_CONF_THRESHOLD     ({})\n".format(float(params.postprocessing.confidence_thresh)))
-            f.write("#define AI_OBJDETECT_SSD_PP_MAX_BOXES_LIMIT    ({})\n".format(int(params.postprocessing.max_detection_boxes)))
-            f.write("#define AI_OBJDETECT_SSD_PP_TOTAL_DETECTIONS   ({})\n".format(int(output_details['shape'][1])))
-        elif (params.model.model_type == "yolov2t" or params.model.model_type == "st_yololcv1"):
+        if (params.model.model_type == "yolov2t" or params.model.model_type == "st_yololcv1"):
             f.write("\n/* Postprocessing TINY_YOLO_V2 configuration */\n")
             yolo_anchors = np.concatenate(params.postprocessing.yolo_anchors).flatten()
             f.write("#define AI_OBJDETECT_YOLOV2_PP_NB_CLASSES      ({})\n".format(len(class_names)))
@@ -253,7 +206,7 @@ def gen_h_user_file_h7(config: DictConfig = None, quantized_model_path: str = No
         f.write("\n")
         f.write("#endif      /* __AI_MODEL_CONFIG_H__ */\n")
 
-    return TFLite_Detection_PostProcess_id, quantized_model_path
+    return None, quantized_model_path
 
 
 def gen_h_user_file_n6(config: DictConfig = None, quantized_model_path: str = None) -> None:
@@ -298,33 +251,9 @@ def gen_h_user_file_n6(config: DictConfig = None, quantized_model_path: str = No
     except OSError as error:
         print(error)
 
-    TFLite_Detection_PostProcess_id = False
     XY, WH = None, None
 
-    if params.model.model_type == "st_ssd_mobilenet_v1":
-        classes = '{\\\n"background",'
-
-    elif params.model.model_type =="ssd_mobilenet_v2_fpnlite":
-
-        name_of_post_process_layer='TFLite_Detection_PostProcess'
-
-        for op in interpreter_quant._get_ops_details():
-            if op['op_name'] == name_of_post_process_layer:
-                TFLite_Detection_PostProcess_id = op['index']
-
-
-        if TFLite_Detection_PostProcess_id:
-            print('[INFO] : This TFLITE model contains a post-processing layer')
-            anchors_path = os.path.join(path,'anchors.h')
-            path_cut_model, XY, WH = ssd_post_processing_removal(quantized_model_path, TFLite_Detection_PostProcess_id, anchors_path)
-            quantized_model_path = path_cut_model
-        else:
-            print('[INFO] : This TFLITE model doesnt contain a post-processing layer')
-
-        classes = '{\\\n"background",'
-
-    else:
-        classes = '{\\\n'
+    classes = '{\\\n'
 
     for i, x in enumerate(params.dataset.class_names):
         if i == (len(class_names) - 1):
@@ -419,15 +348,12 @@ def gen_h_user_file_n6(config: DictConfig = None, quantized_model_path: str = No
 
         f.write("/* Postprocessing type configuration */\n")
 
-        if (params.model.model_type == "st_ssd_mobilenet_v1" or params.model.model_type == "ssd_mobilenet_v2_fpnlite") and not TFLite_Detection_PostProcess_id:
-            f.write("#define POSTPROCESS_TYPE    POSTPROCESS_OD_ST_SSD_UF\n")
-        elif TFLite_Detection_PostProcess_id:
-            raise TypeError("Not supported yet on N6")
-        elif params.model.model_type == "CENTER_NET":
+        
+        if params.model.model_type == "CENTER_NET":
             raise TypeError("Not supported yet on N6")
         elif (params.model.model_type == "yolov2t" or params.model.model_type == "st_yololcv1"):
             f.write("#define POSTPROCESS_TYPE    POSTPROCESS_OD_YOLO_V2_UI\n\n")
-        elif params.model.model_type in ("yolov8n", "yolov11n", "yolov5u"):
+        elif params.model.model_type in ("yolov8n", "yolov11n", "yolov5u", "yolo26n"):
             f.write("#define POSTPROCESS_TYPE    POSTPROCESS_OD_YOLO_V8_UI\n")
         elif params.model.model_type == "st_yoloxn":
             f.write("#define POSTPROCESS_TYPE    POSTPROCESS_OD_ST_YOLOX_UI\n")
@@ -441,29 +367,10 @@ def gen_h_user_file_n6(config: DictConfig = None, quantized_model_path: str = No
         f.write("#define COLOR_MODE {}\n".format(color_mode_n6_dict[params.preprocessing.color_mode]))
 
         f.write("/* Classes */\n")
-        if params.model.model_type == "st_ssd_mobilenet_v1" or params.model.model_type == "ssd_mobilenet_v2_fpnlite":
-            f.write("#define NB_CLASSES        ({})\n".format(len(class_names)+1))
-        else:
-            f.write("#define NB_CLASSES   ({})\n".format(len(class_names)))
+        f.write("#define NB_CLASSES   ({})\n".format(len(class_names)))
         f.write("#define CLASSES_TABLE const char* classes_table[NB_CLASSES] = {}\n".format(classes))
 
-        if (params.model.model_type == "st_ssd_mobilenet_v1" or params.model.model_type == "ssd_mobilenet_v2_fpnlite") and not TFLite_Detection_PostProcess_id:
-            f.write("/* Postprocessing ST_SSD configuration */\n")
-            f.write("#define AI_OD_SSD_ST_PP_NB_CLASSES         ({})\n".format(len(class_names)+1))
-            f.write("#define AI_OD_SSD_ST_PP_IOU_THRESHOLD      ({})\n".format(float(params.postprocessing.NMS_thresh)))
-            f.write("#define AI_OD_SSD_ST_PP_CONF_THRESHOLD     ({})\n".format(float(params.postprocessing.confidence_thresh)))
-            f.write("#define AI_OD_SSD_ST_PP_MAX_BOXES_LIMIT    ({})\n".format(int(params.postprocessing.max_detection_boxes)))
-            f.write("#define AI_OD_SSD_ST_PP_TOTAL_DETECTIONS   ({})\n".format(int(output_details['shape'][1])))
-        elif  TFLite_Detection_PostProcess_id:
-            f.write("\n/* Postprocessing SSD configuration */\n")
-            f.write("#define AI_OD_SSD_PP_XY_SCALE           ({})\n".format(XY))
-            f.write("#define AI_OD_SSD_PP_WH_SCALE           ({})\n".format(WH))
-            f.write("#define AI_OD_SSD_PP_NB_CLASSES         ({})\n".format(len(class_names)+1))
-            f.write("#define AI_OD_SSD_PP_IOU_THRESHOLD      ({})\n".format(float(params.postprocessing.NMS_thresh)))
-            f.write("#define AI_OD_SSD_PP_CONF_THRESHOLD     ({})\n".format(float(params.postprocessing.confidence_thresh)))
-            f.write("#define AI_OD_SSD_PP_MAX_BOXES_LIMIT    ({})\n".format(int(params.postprocessing.max_detection_boxes)))
-            f.write("#define AI_OD_SSD_PP_TOTAL_DETECTIONS   ({})\n".format(int(output_details['shape'][1])))
-        elif (params.model.model_type in ("yolov2t", "st_yololcv1")):
+        if (params.model.model_type in ("yolov2t", "st_yololcv1")):
             f.write("\n/* Postprocessing TINY_YOLO_V2 configuration */\n")
 
             f.write("#define AI_OD_YOLOV2_PP_NB_CLASSES      ({})\n".format(len(class_names)))
@@ -509,7 +416,7 @@ def gen_h_user_file_n6(config: DictConfig = None, quantized_model_path: str = No
             f.write("#define AI_OD_ST_YOLOX_PP_CONF_THRESHOLD     ({})\n".format(float(params.postprocessing.confidence_thresh)))
             f.write("#define AI_OD_ST_YOLOX_PP_MAX_BOXES_LIMIT    ({})\n".format(int(params.postprocessing.max_detection_boxes)))
 
-        elif (params.model.model_type in ("yolov8n", "yolov11n", "yolov5u")):
+        elif (params.model.model_type in ("yolov8n", "yolov11n", "yolov5u", "yolo26n")):
             f.write("\n/* Postprocessing YOLO_V8 configuration */\n")
 
             if quantized_model_path.lower().endswith('.tflite'):
@@ -557,7 +464,7 @@ def gen_h_user_file_n6(config: DictConfig = None, quantized_model_path: str = No
         f.write("\n")
         f.write("#endif      /* APP_CONFIG */\n")
 
-    return TFLite_Detection_PostProcess_id, quantized_model_path
+    return None, quantized_model_path
 
 
 def gen_h_user_file_n6_onnx_ssd(config, quantized_model_path: str = None) -> None:

@@ -8,6 +8,8 @@
 #  *--------------------------------------------------------------------------------------------*/
 
 import os
+import subprocess
+import time
 from typing import Dict, List
 from munch import DefaultMunch
 from omegaconf import DictConfig
@@ -16,6 +18,9 @@ import re
 import numpy as np
 import requests
 from hydra.core.hydra_config import HydraConfig
+
+
+STEDGEAI_VERSION_DEV_CLOUD = "4.0.0"
 
 
 aspect_ratio_dict = {"fit": "ASPECT_RATIO_FIT",
@@ -28,33 +33,59 @@ color_mode_n6_dict = {"rgb": "COLOR_RGB",
                       
 
 
-def download_file(url:str, local_path:str):
+def download_file(url: str, local_path: str, max_retries: int = 3, retry_delay: int = 30):
     """
     Downloads a file from the given URL and saves it to the specified local path.
+    Retries up to max_retries times with retry_delay seconds between attempts.
     args:
         url (str): URL of the file to download
-        local_path(str): Local path where the file should be saved
+        local_path (str): Local path where the file should be saved
+        max_retries (int): Maximum number of download attempts (default: 3)
+        retry_delay (int): Seconds to wait between retries (default: 30)
     """
-    try:
-        # Send a GET request to the URL
-        response = requests.get(url, stream=True, timeout=20) # timeout of 20 seconds
+    # Build proxy dict from environment variables (http_proxy / https_proxy / no_proxy)
+    proxies = {}
+    http_proxy = os.environ.get('http_proxy') or os.environ.get('HTTP_PROXY')
+    https_proxy = os.environ.get('https_proxy') or os.environ.get('HTTPS_PROXY')
+    no_proxy = os.environ.get('no_proxy') or os.environ.get('NO_PROXY') or ''
+    if http_proxy:
+        proxies['http'] = http_proxy
+    if https_proxy:
+        proxies['https'] = https_proxy
+    if no_proxy:
+        proxies['no_proxy'] = no_proxy
+    proxies = proxies if proxies else None
 
-        # Check if the request was successful
-        response.raise_for_status()
+    last_err = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = requests.get(url, stream=True, timeout=20, proxies=proxies)
+            response.raise_for_status()
 
-        # Open the local file in write-binary mode
-        with open(local_path, 'wb') as file:
-            # Iterate over the response content in chunks
-            for chunk in response.iter_content(chunk_size=8192):
-                # Write each chunk to the local file
-                file.write(chunk)
+            with open(local_path, 'wb') as file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    file.write(chunk)
 
-        print(f"[INFO] : Pretrained model file downloaded successfully and saved as :\n\t{local_path}")
+            print(f"[INFO] : Pretrained model file downloaded successfully and saved as :\n\t{local_path}")
+            return
 
-    except requests.exceptions.HTTPError as http_err:
-        print(f"[ERROR] : HTTP error occurred :\n\t{http_err}")
-    except Exception as err:
-        print(f"[ERROR] : An error occurred while downloading the pretrained model \n\t: {err}")
+        except requests.exceptions.HTTPError as http_err:
+            last_err = http_err
+            print(f"[ERROR] : HTTP error occurred (attempt {attempt}/{max_retries}) :\n\t{http_err}")
+        except Exception as err:
+            last_err = err
+            print(f"[ERROR] : An error occurred while downloading the pretrained model "
+                  f"(attempt {attempt}/{max_retries}) :\n\t{err}")
+
+        if attempt < max_retries:
+            print(f"[INFO] : Retrying download in {retry_delay} seconds...")
+            time.sleep(retry_delay)
+
+    raise RuntimeError(
+        f"\nFailed to download model from URL after {max_retries} attempt(s):\n\t{url}\n"
+        f"Last error: {last_err}\n"
+        "Please check your network/proxy settings or provide a local model_path."
+    )
 
 
 def check_attributes(cfg: Dict, 
@@ -299,7 +330,7 @@ def check_model_file_extension(ml_path, mode, mode_groups, field_name):
         raise FileNotFoundError(
             f"\nUnable to find file {ml_path}\nPlease check the '{field_name}' attribute in your configuration file"
         )
-        
+
 
 def parse_tools_section(cfg: DictConfig, 
                         operation_mode: str,
@@ -321,7 +352,7 @@ def parse_tools_section(cfg: DictConfig,
         check_config_attributes(cfg, specs={"legal": legal, "all": required}, section="tools")
 
         # stedgeai usage
-        legal = ["optimization", "on_cloud", "path_to_stedgeai"]
+        legal = ["optimization", "on_cloud", "path_to_stedgeai", "hsp"]
         check_config_attributes(cfg.stedgeai, 
                                 specs={"legal": legal, "all": []}, section="tools.stedgeai")
         if not cfg.stedgeai.on_cloud:
@@ -333,11 +364,12 @@ def parse_tools_section(cfg: DictConfig,
         # Patch to support stedgeai with legacy naming stm32ai : reconstruct stm32ai dictionnary
         # from stedgeai one
         cfg["stm32ai"] = cfg.stedgeai
+        cfg.stm32ai["hsp"] = cfg.stedgeai.hsp if 'hsp' in cfg.stedgeai else 4096  # Maximum BRAM usage for the HSP acceleration
         cfg.stm32ai["optimization"] = cfg.stedgeai.optimization if cfg.stedgeai.optimization else "balanced"
         cfg.stm32ai["on_cloud"] = cfg.stedgeai.on_cloud # if cfg.stedgeai.on_cloud else True
         cfg.stm32ai["path_to_stm32ai"] = cfg.stedgeai.path_to_stedgeai if cfg.stedgeai.path_to_stedgeai else None
-        cfg.stm32ai["version"] = Path(cfg.stedgeai.path_to_stedgeai).parts[-4]
-        cfg.stedgeai["version"] = Path(cfg.stedgeai.path_to_stedgeai).parts[-4]
+        cfg.stm32ai["version"] = STEDGEAI_VERSION_DEV_CLOUD
+        cfg.stedgeai["version"] = STEDGEAI_VERSION_DEV_CLOUD
     # Path to cubeIDE only needed for MCU in deployment service
     if hardware_type == "MCU":
         if operation_mode == "deployment" and not os.path.isfile(cfg.path_to_cubeIDE):

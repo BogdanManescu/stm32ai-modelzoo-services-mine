@@ -20,26 +20,47 @@ def load_tfs_like(cfg: DictConfig,
                   image_size: tuple[int],
                   val_batch_size: int) -> dict:
     """
-    Handles datasets where images and labels are already in TFS format (JPEG + TFS files)
-    and the dataset are already split into several subsets.
+    Load an already-prepared TFS dataset.
+
+    This loader expects:
+      - raw images in the source image directories:
+          * dataset.train_images_path
+          * dataset.val_images_path
+          * dataset.test_images_path
+        (depending on the requested split and mode)
+      - corresponding .tfs files stored in the split-specific TFS directories:
+          * dataset.train_annotations_path
+          * dataset.val_annotations_path
+          * dataset.test_annotations_path
+
+    The loader does not perform any dataset conversion.
+
+    Expected usage:
+      - training pairs are built from train_images_path + train_annotations_path
+      - validation pairs are built from val_images_path + val_annotations_path, if explicit validation exists
+        otherwise validation is created by splitting the training TFS set
+      - test pairs are built from test_images_path + test_annotations_path
 
     Args:
         cfg (DictConfig): Configuration object containing dataset parameters including:
-            - dataset.format: The corresponding dataset format (tfs, darknet_yolo, coco, pascal_voc).
-            - dataset.training_path: Path for processed training data
-            - dataset.test_path: Path for processed test data
-            - dataset.validation_path: Path for processed validation data
-            - dataset.quantization_path: Path for quantization data (required if quantization is enabled)
-            - dataset.prediction_path: Path for prediction data (required if prediction is enabled)
+            - dataset.format: "tfs"
+            - dataset.train_images_path: Path to training images
+            - dataset.val_images_path: Path to validation images
+            - dataset.test_images_path: Path to test images
+            - dataset.train_annotations_path: Path to training TFS files
+            - dataset.val_annotations_path: Path to validation TFS files
+            - dataset.test_annotations_path: Path to test TFS files
+            - dataset.validation_split: Validation split ratio when no explicit validation TFS path is provided
             - dataset.class_names: List of class names to use
-            - dataset.download_data: Whether to download dataset (unsupported for Darknet YOLO format)
-            - settings.max_detections: Optional maximum number of detections per image
-            - settings.exclude_unlabeled_images: Whether to exclude images without labels
-            - operation_mode (str): One of the supported modes or chains (e.g., chain_eqeb, training, evaluation, etc.)
+            - dataset.exclude_unlabeled: Whether to exclude unlabeled samples
+            - dataset.max_detections: Maximum number of detections per image
+            - dataset.seed: Random seed
+            - operation_mode: One of the supported modes or chains
 
     Returns:
-        dict[str, tf.data.Dataset]: Dictionary containing training, validation, test,
-            quantization and prediction datasets as TensorFlow datasets.
+        dict[str, tf.data.Dataset]:
+            A dictionary containing the available TensorFlow datasets
+            (training, validation, test, quantization, prediction) depending on the mode.
     """
 
     if not hasattr(cfg, 'operation_mode'):
@@ -77,10 +98,7 @@ def load_tfs_like(cfg: DictConfig,
     is_training = is_mode_in_group("training")
     is_evaluation = is_mode_in_group("evaluation")
     is_quantization = is_mode_in_group("quantization")
-    is_benchmarking = is_mode_in_group("benchmarking")
-    is_deployment = is_mode_in_group("deployment")
     is_prediction = is_mode_in_group("prediction")
-    is_compression = is_mode_in_group("compression")
 
     # Verify required class names
     if not hasattr(cfg.dataset, 'class_names'):
@@ -88,23 +106,32 @@ def load_tfs_like(cfg: DictConfig,
 
     # Validate paths depending on operation mode
     if is_training:
-        if not hasattr(cfg.dataset, 'training_path'):
-            raise ValueError("cfg.dataset.training_path must be specified in training mode")
-        if not os.path.exists(cfg.dataset.training_path):
-            raise ValueError(f"Training path {cfg.dataset.training_path} does not exist")
-        os.makedirs(cfg.dataset.training_path, exist_ok=True)
+        if not hasattr(cfg.dataset, 'train_images_path'):
+            raise ValueError("cfg.dataset.train_images_path must be specified in training mode")
+        if not os.path.exists(cfg.dataset.train_images_path):
+            raise ValueError(f"Training path {cfg.dataset.train_images_path} does not exist")
+        if not hasattr(cfg.dataset, 'train_annotations_path'):
+            raise ValueError("cfg.dataset.train_annotations_path must be specified in training mode")
+        if not os.path.exists(cfg.dataset.train_annotations_path):
+            raise ValueError(f"Training path {cfg.dataset.train_annotations_path} does not exist")
         print("Skipping dataset analysis as for TFS dataset format.\n")
+        cfg.dataset.training_path = cfg.dataset.train_annotations_path
 
-    if hasattr(cfg.dataset, 'validation_path') and cfg.dataset.validation_path:
-        if not os.path.exists(cfg.dataset.validation_path):
-            raise ValueError(f"Validation path {cfg.dataset.validation_path} does not exist")
-        os.makedirs(cfg.dataset.validation_path, exist_ok=True)
+    if hasattr(cfg.dataset, 'val_images_path') and cfg.dataset.val_images_path:
+        if not os.path.exists(cfg.dataset.val_images_path):
+            raise ValueError(f"Val images path {cfg.dataset.val_images_path} does not exist")
+        if not os.path.exists(cfg.dataset.val_annotations_path):
+            raise ValueError(f"Val annoations path {cfg.dataset.val_annotations_path} does not exist")
 
     if is_evaluation:
-        if not hasattr(cfg.dataset, 'test_path') and not cfg.dataset.test_path:
-            raise ValueError("cfg.dataset.test_path must be specified in evaluation mode")
-        if not os.path.exists(cfg.dataset.test_path):
-            raise ValueError(f"Test path {cfg.dataset.test_path} does not exist")
+        if not hasattr(cfg.dataset, 'test_images_path') and not cfg.dataset.test_images_path:
+            raise ValueError("cfg.dataset.test_images_path must be specified in evaluation mode")
+        if not os.path.exists(cfg.dataset.test_images_path):
+            raise ValueError(f"Test path {cfg.dataset.test_images_path} does not exist")
+        if not hasattr(cfg.dataset, 'test_annotations_path') and not cfg.dataset.test_annotations_path:
+            raise ValueError("cfg.dataset.test_annotations_path must be specified in evaluation mode")
+        if not os.path.exists(cfg.dataset.test_annotations_path):
+            raise ValueError(f"Test path {cfg.dataset.test_annotations_path} does not exist")
 
     if is_prediction:
         if not hasattr(cfg.dataset, 'prediction_path'):

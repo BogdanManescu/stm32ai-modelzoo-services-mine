@@ -36,14 +36,16 @@ def parse_label_file(txt_file_path : str=None) -> list:
     return labels
 
 
-def compute_labels_stats(dataset_path : str=None,
-                         dataset_name : str=None,
-                         histogram_dir: str=None) -> None:
+def compute_labels_stats(dataset_path : str,
+                         annotations_path: str,
+                         dataset_name: str = None,
+                         histogram_dir: str = None) -> None:
     """
     Provides statistics on the dataset labels
 
     Args:
-        dataset_path (str) : Path of the dataset to analyze
+        images_path (str) : Path of the directory containing the jpg images
+        annotations_path: Path of the directory containing the txt files
         dataset_name (str) : Name of the dataset used
         histogram_dir (str): location of the histograms storage
 
@@ -64,7 +66,7 @@ def compute_labels_stats(dataset_path : str=None,
 
     label_sizes = []
     for jpg_path in tqdm(jpg_file_paths):
-        txt_path = os.path.join(Path(jpg_path).parent, Path(jpg_path).stem + ".txt")
+        txt_path = os.path.join(annotations_path, Path(jpg_path).stem + ".txt")
         if os.path.isfile(txt_path):
             num_txt_files += 1
             labels = parse_label_file(txt_path)
@@ -95,14 +97,16 @@ def compute_labels_stats(dataset_path : str=None,
     plt.close()
 
 
-def compute_class_stats(dataset_path : str=None,
-                        dataset_name : str=None,
-                        histogram_dir: str=None) -> None:
+def compute_class_stats(images_path: str,
+                        annotations_path: str,
+                        dataset_name: str = None,
+                        histogram_dir: str = None) -> None:
     """
     Provides statistics on the dataset classes
 
     Args:
-        dataset_path (str) : Path of the dataset to analyze
+        images_path (str) : Path of the directory containing the jpg images
+        annotations_path: Path of the directory containing the txt files
         dataset_name (str) : Name of the dataset used
         histogram_dir (str): location of the histograms storage
 
@@ -111,15 +115,15 @@ def compute_class_stats(dataset_path : str=None,
     """
     print("\nCalculating groundtruth class statistics:")
     print("----------------------------------------")
-    print("Dataset root:", dataset_path)
+    print("Images root:", images_path)
 
-    jpg_file_paths = glob.glob(os.path.join(dataset_path, "*.jpg"))
+    jpg_file_paths = glob.glob(os.path.join(images_path, "*.jpg"))
     if len(jpg_file_paths) == 0:
         raise ValueError(f"Could not find any .jpg file in dataset root directory")
 
     classes = []
     for jpg_path in tqdm(jpg_file_paths):
-        txt_path = os.path.join(Path(jpg_path).parent, Path(jpg_path).stem + ".txt")
+        txt_path = os.path.join(annotations_path, Path(jpg_path).stem + ".txt")
         if not os.path.isfile(txt_path):
             continue
         labels = parse_label_file(txt_path)

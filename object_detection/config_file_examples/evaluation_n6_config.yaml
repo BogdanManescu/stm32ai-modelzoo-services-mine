@@ -16,8 +16,8 @@ dataset:
   format: tfs
   dataset_name: coco
   class_names: [person]
-  test_path: ./datasets/coco_2017_person/test
-  validation_path: ./datasets/coco_2017_person/evaluation
+  test_images_path: /local/data/mini_od_person/tfs/test/images
+  test_annotations_path: /local/data/mini_od_person/tfs/test/annotations
 
 
 preprocessing:
@@ -36,7 +36,7 @@ postprocessing:
 
 tools:
    stedgeai:
-      path_to_stedgeai: C:/ST/STEdgeAI/3.0/Utilities/windows/stedgeai.exe
+      path_to_stedgeai: C:/ST/STEdgeAI/4.0/Utilities/windows/stedgeai.exe
 
 mlflow:
    uri: ./tf/src/experiments_outputs/mlruns

@@ -1,21 +1,25 @@
 # <a>Object detection STM32 model zoo</a>
 
-Before you start using this project, it's important to understand the supported dataset names and formats. Please note that for all the training, evaluation and quantization services, it is expected to have a dataset in TFS Tensorflow format. For the object detection use case, the `get_dataset` API call takes care of the conversion of your dataset automatically depending on the `dataset_name` and `format` attributes.
+Before you start using this project, it's important to understand the supported dataset names and formats. Please note that for all the training, evaluation and quantization services, it is expected to have a dataset in TFS Tensorflow format. For the object detection use case, the `get_dataloaders` API call takes care of the conversion of your dataset automatically depending on the `dataset_name` and `format` attributes.
 
-The `dataset` section and its attributes are shown in the YAML code below.
+The `dataset` section and its attributes are shown in the YAML example code below.
 
 ```yaml
 dataset:
   format: pascal_voc
   dataset_name: pascal_voc                                    # Dataset name. Defaults to "<unnamed>".
-  class_names: [ aeroplane,bicycle,bird,boat,bottle,bus,car,cat,chair,cow,diningtable,dog,horse,motorbike,person,pottedplant,sheep,sofa,train,tvmonitor ] # Names of the classes in the dataset.
-  data_dir: ./datasets/pascal_voc/tmp/                       # Path to the tmp directory before the split.
-  train_images_path: /local/datasets/VOC0712/JPEGImages/     # Path to the root directory of the img before split.
-  train_xml_dir: /local/datasets/VOC0712/Annotations         # Path to the root directory of the xml annotations
-  training_path: <training-set-root-directory>               # Path to the root directory of the training set.
-  validation_path: <validation-set-root-directory>           # Path to the root directory of the validation set.
-  validation_split: 0.2                                      # Training/validation sets split ratio.
-  test_path: <test-set-root-directory>                       # Path to the root directory of the test set.
+  class_names: [ aeroplane,bicycle,bird,boat,bottle,bus,car,cat,chair,cow,diningtable,dog,horse,motorbike,person,pottedplant,sheep,sofa,train,tvmonitor ]  # Names of the classes in the dataset.
+  data_dir: <tmp-directory-where-dataset-will-be-downloaded> # Path to the tmp directory before the split.
+  train_images_path: <JPEGImages-root-directory>             # Path to the root directory of the img before split.
+  train_annotations_path: <path-to-the-Annotations-dir>      # Path to the root directory of the xml annotations
+  val_images_path: <JPEGImages-root-directory>               # Path to the root directory of the img (usually the same as train_images_path).
+  val_annotations_path: <path-to-the-Annotations-dir>        # Path to the root directory of the xml annotations (usually the same as train_annotations_path)
+  test_images_path: <JPEGImages-root-directory>              # Path to the root directory of the img (usually the same as train_images_path).
+  test_annotations_path: <path-to-the-Annotations-dir>       # Path to the root directory of the xml annotations (usually the same as train_annotations_path)
+  train_split:  <path-to-the-ImageSets/Main/train.txt>       # Path to the .txt file containing the split for training.
+  val_split:  <path-to-the-ImageSets/Main/val.txt>           # Path to the .txt file containing the split for training. (Optional)
+  test_split:  <path-to-the-ImageSets/Main/test.txt>         # Path to the .txt file containing the split for training. (Optional)
+  # validation_split: 0.2                                    # Training/validation sets split ratio. (Optional if val_*_path is defined)
   quantization_path: <quantization-set-root-directory>       # Path to the root directory of the quantization set.
   quantization_split:                                        # Quantization split ratio.
   seed: 123                                                  # Random generator seed used when splitting a dataset.
@@ -43,21 +47,36 @@ This determines whether it is needed to convert the dataset to the required TFS 
 
 Depending on the `format` value, some additional attributes should be defined in the dataset section:
 - If the `format` is set to **coco**, the following attributes should be set:
-  * The `data_dir`: Required, refers to the temporary path where the TFS files will be generated.
+  * The `data_dir`: Required if `download_data` is set to True, refers to the temporary path where the dataset will be downloaded.
   * The `train_images_path`: Required, refers to the path of the training subset directory where the images are located.
-  * The `train_annotations_path`: Required, refers to the path of the training subset json file of the annotations.
+  * The `train_annotations_path`: Required, refers to the path of the training subset JSON file of the annotations.
   * The `val_images_path`: Optional, refers to the path of the validation subset directory where the images are located.
-  * The `val_annotations_path`: Optional, refers to the path of the training subset json file of the annotations.
+  * The `val_annotations_path`: Optional, refers to the path of the validation subset JSON file of the annotations.
+  * The `test_images_path`: Optional, refers to the path of the test subset (evaluation-only) directory where the images are located.
+  * The `test_annotations_path`: Optional, refers to the path of the test subset (evalutation-only) JSON file of the annotations.
+  * The `validation_split`: Optional, refers to a % ratio of the training set, should be defined if the `val_images_path` and `val_annotations_path` are missing.
 
 - If the `format` is set to **pascal_voc**, the following attributes should be set:
-  * The `data_dir`: Required, refers to the temporary path where the TFS files will be generated.
+  * The `data_dir`: Required if `download_data` is set to True, refers to the temporary path where the dataset will be downloaded.
   * The `train_images_path`: Required, refers to the path of the training subset directory where the images are located.
-  * The `train_xml_dir`: Required, refers to the path of the training subset directory containing the xml files of the annotations.
+  * The `train_annotations_path`: Required, refers to the path of the training subset directory containing the xml files of the annotations.
+  * The `train_split`: Required, refers to the train.txt containing the split IDs for training subsets.
   * The `val_images_path`: Optional, refers to the path of the validation subset directory where the images are located.
-  * The `val_xml_dir`: Optional, refers to the path of the training subset directory containing the xml files of the annotations.
+  * The `val_annotations_path`: Optional, refers to the path of the training subset directory containing the XML files of the annotations.
+  * The `val_split`: Required, refers to the val.txt containing the split IDs for validation subsets.
+  * The `test_images_path`: Optional, refers to the path of the validation subset directory where the images are located.
+  * The `test_annotations_path`: Optional, refers to the path of the training subset directory containing the XML files of the annotations.
+  * The `test_split`: Required, refers to the test.txt containing the split IDs for training subsets.
+  * The `validation_split`: Optional, refers to a % ratio of the training set, should be defined if the `val_images_path` and `val_annotations_path` are missing.
 
 - If the `format` is set to **darknet_yolo**, the following attributes should be set:
-  * The `data_dir`: Required, refers to the path of the directory containing the txt files of the annotations along with the images.
+  * The `train_images_path`: Required, refers to the path of the training subset directory where the images are located.
+  * The `train_annotations_path`: Required, refers to the path of the training subset directory containing the xml files of the annotations.
+  * The `val_images_path`: Optional, refers to the path of the validation subset directory where the images are located.
+  * The `val_annotations_path`: Optional, refers to the path of the validation subset directory containing the TXT files of the annotations.
+  * The `test_images_path`: Optional, refers to the path of the test subset (evaluation-only) directory where the images are located.
+  * The `test_annotations_path`: Optional, refers to the path of the test subset (evaluation-only) directory containing the TXT files of the annotations. 
+  * The `validation_split`: Optional, refers to a % ratio of the training set, should be defined if the `val_images_path` and `val_annotations_path` are missing.
 
 
 The state machine below describes the process of dataset loading for object detection use case.
@@ -127,8 +146,21 @@ convert coco to tfs      convert pascal_voc to tfs     convert darknet yolo to t
 
 **Required attributes**
 
-- `data_dir`  
-  → Temporary path where the TFS files are located.
+- `train_images_path`  
+  → Path to training images directory.
+- `train_annotations_path`  
+  → Path to the training TFS files directory.
+
+**Optional attributes**
+
+- `val_images_path`  
+  → Path to validation images directory.
+- `val_annotations_path`  
+  → Path to the validation TFS files directory.
+- `test_images_path`  
+  → Path to test images directory.
+- `test_annotations_path`  
+  → Path to the test TFS files directory.
 
 ---
 
@@ -139,7 +171,7 @@ convert coco to tfs      convert pascal_voc to tfs     convert darknet yolo to t
 **Required attributes**
 
 - `data_dir`  
-  → Temporary path where the TFS files will be generated.
+  → Temporary path where the dataset will be downloaded if `download_data` is set to true.
 - `train_images_path`  
   → Path to training images directory.
 - `train_annotations_path`  
@@ -151,12 +183,16 @@ convert coco to tfs      convert pascal_voc to tfs     convert darknet yolo to t
   → Path to validation images directory.
 - `val_annotations_path`  
   → Path to validation subset COCO JSON annotations file.
+- `test_images_path`  
+  → Path to test images directory.
+- `test_annotations_path`  
+  → Path to test subset COCO JSON annotations file (usually same as validation).
 
 **Conversion flow**
 
 1. Read images/annotations from `train_*` (and optionally `val_*`).
-2. Generate TFS TensorFlow records into `data_dir`.
-3. Load resulting TFS dataset for training / evaluation / quantization with the specified split ratios.
+2. Generate TFS TensorFlow records into `labels_tfs` directory containing the corresponding splits (train, val, test).
+3. Load resulting TFS dataset for training / evaluation / quantization with the specified split ratios or the defined paths.
 
 ---
 
@@ -174,8 +210,21 @@ convert coco to tfs      convert pascal_voc to tfs     convert darknet yolo to t
 
 **Required attributes**
 
-- `data_dir`  
-  → Temporary path where the TFS files are located.
+- `train_images_path`  
+  → Path to training images directory.
+- `train_annotations_path`  
+  → Path to the training TFS files directory.
+
+**Optional attributes**
+
+- `val_images_path`  
+  → Path to validation images directory.
+- `val_annotations_path`  
+  → Path to the validation TFS files directory.
+- `test_images_path`  
+  → Path to test images directory.
+- `test_annotations_path`  
+  → Path to the test TFS files directory.
 
 ---
 
@@ -186,24 +235,34 @@ convert coco to tfs      convert pascal_voc to tfs     convert darknet yolo to t
 **Required attributes**
 
 - `data_dir`  
-  → Temporary path where the TFS files will be generated.
+  → Temporary path where the dataset files will be downloaded if `download_data` is set to true.
 - `train_images_path`  
   → Path to training images directory.
-- `train_xml_dir`  
+- `train_annotations_path`  
   → Path to directory containing training XML annotation files.
+- `train_split`
+  → Path to the val.txt file containing the training split IDs.
 
 **Optional attributes**
 
 - `val_images_path`  
   → Path to validation images directory.
-- `val_xml_dir`  
+- `val_annotations_path`  
   → Path to directory containing validation XML annotation files.
+- `val_split`
+  → Path to the val.txt file containing the validation split IDs.
+- `test_images_path`  
+  → Path to test images directory.
+- `test_annotations_path`  
+  → Path to directory containing test XML annotation files.
+- `train_split`
+  → Path to the test.txt file containing the test split IDs.
 
 **Conversion flow**
 
 1. Read images/annotations from `train_*` (and optionally `val_*`).
-2. Generate TFS TensorFlow records into `data_dir`.
-3. Load resulting TFS dataset for training / evaluation / quantization.
+2. Generate TFS TensorFlow records into `labels_tfs` directory containing the corresponding splits (train, val, test).
+3. Load resulting TFS dataset for training / evaluation / quantization with the specified split ratios or the defined paths.
 
 ---
 
@@ -221,8 +280,21 @@ convert coco to tfs      convert pascal_voc to tfs     convert darknet yolo to t
 
 **Required attributes**
 
-- `data_dir`  
-  → Temporary path where the TFS files are located.
+- `train_images_path`  
+  → Path to training images directory.
+- `train_annotations_path`  
+  → Path to the training TFS files directory.
+
+**Optional attributes**
+
+- `val_images_path`  
+  → Path to validation images directory.
+- `val_annotations_path`  
+  → Path to the validation TFS files directory.
+- `test_images_path`  
+  → Path to test images directory.
+- `test_annotations_path`  
+  → Path to the test TFS files directory.
 
 ---
 
@@ -232,18 +304,27 @@ convert coco to tfs      convert pascal_voc to tfs     convert darknet yolo to t
 
 **Required attributes**
 
-- `data_dir`  
-  → Path to the directory containing:
-  - the `.txt` annotation files
-  - the corresponding images
+- `train_images_path`  
+  → Path to training images directory.
+- `train_annotations_path`
+  → Path to the directory containing the TXT files for training subset.
 
-> No separate train/val split paths are specified. By convention, `data_dir` contains both the `.txt` files and images to be converted.
+**Optional attributes**
+
+- `val_images_path`  
+  → Path to validation images directory.
+- `val_annotations_path`  
+  → Path to the directory containing the TXT files for training subset.
+- `test_images_path`  
+  → Path to test images directory.
+- `test_annotations_path`  
+  → Path to the directory containing the TXT files for training subset.
 
 **Conversion flow**
 
-1. Parse YOLO `.txt` annotations and corresponding images in `data_dir`.
-2. Generate TFS TensorFlow records.
-3. Load resulting TFS dataset for training / evaluation / quantization.
+1. Parse YOLO `.txt` annotations and corresponding images in `train_images_path` and `train_annotations_path`.
+2. Generate TFS TensorFlow records into `labels_tfs` directory containing the corresponding splits (train, val, test).
+3. Load resulting TFS dataset for training / evaluation / quantization with the specified split ratios or the defined paths.
 
 ---
 
@@ -258,10 +339,23 @@ This case assumes:
 - The user has already produced a **TFS TensorFlow dataset** externally or from a previous operation.
 - The loader only reads the TFS dataset (no conversion is performed).
 
-**Required / optional attributes**
+**Required attributes**
 
-- Depend on your custom TFS dataset layout (not defined here).
-- At minimum, paths pointing to the TFS TFRecord files (train/val) must be provided according to the specific tool’s configuration schema.
+- `train_images_path`  
+  → Path to training images directory.
+- `train_annotations_path`  
+  → Path to the training TFS files directory.
+
+**Optional attributes**
+
+- `val_images_path`  
+  → Path to validation images directory.
+- `val_annotations_path`  
+  → Path to the validation TFS files directory.
+- `test_images_path`  
+  → Path to test images directory.
+- `test_annotations_path`  
+  → Path to the test TFS files directory.
 
 ---
 

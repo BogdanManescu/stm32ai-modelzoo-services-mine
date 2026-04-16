@@ -24,7 +24,7 @@ marshmallow==3.24.1
 tf2onnx==1.16.1
 tabulate==0.9.0
 colorama==0.4.6
-pip-system-certs==5.2
+pip-system-certs==5.2; sys_platform == "win32"
 clearml==1.16.5
 neural-compressor==3.4.1
 pytorchcv==0.0.73

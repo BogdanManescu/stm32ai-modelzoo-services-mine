@@ -15,11 +15,11 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 import argparse
-from pathlib import Path
 from omegaconf import DictConfig
 from hydra.core.hydra_config import HydraConfig
-import mlflow
 import tensorflow as tf
+import mlflow
+
 from clearml import Task
 from clearml.backend_config.defs import get_active_config_file
 import torch
@@ -48,7 +48,7 @@ from object_detection.pt.src.utils.yolod import (configure_module,
 tf.config.run_functions_eagerly(False)
 
 
-def process_mode(cfg: DictConfig):
+def _process_mode(cfg: DictConfig):
     """
     Execution of the various services
 
@@ -76,7 +76,6 @@ def process_mode(cfg: DictConfig):
     if cfg.model.framework == 'torch' and isinstance(model, torch.nn.Module) and cfg.operation_mode not in ['training', 'chain_tb', 'chain_tqe', 'chain_tqeb', 'chain_tbqeb']:
         # Export Torch models in onnx format for all services but training 
         # (export to onnx is also handled at the end of the trainer.train() method)
-        
         model = torch_model_export_static(cfg=cfg, 
                                             model_dir=saved_model_dir, 
                                             model=model)
@@ -93,10 +92,8 @@ def process_mode(cfg: DictConfig):
         print("[INFO] training complete")
 
     elif mode == "evaluation":
-        
         # Generates the model to be loaded on the stm32n6 device using stedgeai core,
         # then loads it and validates in on the device if required.
-        
         gen_load_val(cfg=cfg, model=model)
         # Launches evaluation on the target through the model zoo evaluation service
         os.chdir(os.path.dirname(os.path.realpath(__file__)))
@@ -253,6 +250,75 @@ def process_mode(cfg: DictConfig):
         task = Task.current_task()
         task.connect(cfg)
 
+
+def _fw_agnostic_initializations(cfg: DictConfig = None) -> DictConfig:
+    """
+    Framework-agnostic initializations.
+
+    This function performs initializations that are independent of the specific deep learning framework being used.
+    It includes parsing the configuration file, setting up MLFlow, and initializing ClearML if a valid configuration
+    file is found.
+
+    Args:
+        cfg (DictConfig): Configuration object.
+
+    Returns:
+        DictConfig: Updated configuration object with initialized settings.
+    """
+
+    # Parse the configuration file and set the output directory
+    cfg = get_config(cfg)
+    cfg.output_dir = HydraConfig.get().run.dir  #HydraConfig.get().runtime.output_dir
+
+    # Initialize MLFlow for experiment tracking
+    # MLFlow is used to log metrics, parameters, and artifacts during training
+    mlflow_ini(cfg)
+
+    # Check if there's a valid ClearML configuration file and initialize ClearML
+    print(f"[INFO] : ClearML config check")
+    if get_active_config_file() is not None:
+        # If a ClearML configuration file is found, initialize ClearML
+        print(f"[INFO] : ClearML initialization and configuration")
+        # Initialize ClearML's Task object with the project and task names
+        task = Task.init(project_name=cfg.general.project_name,
+                         task_name='od_modelzoo_task')
+        # Optionally log the configuration to ClearML
+        task.connect_configuration(name=cfg.operation_mode, 
+                                   configuration=cfg)
+    
+    # Return the updated configuration object
+    return cfg
+
+
+def _tf_specific_initializations(cfg: DictConfig = None) -> None:
+    """
+    TensorFlow-specific initializations.
+
+    This function performs initializations specific to TensorFlow, such as configuring GPU memory limits
+    and setting a random seed for reproducibility.
+
+    Args:
+        cfg (DictConfig): Configuration object.
+    """
+    # Check if the 'general' section exists in the configuration
+    if "general" in cfg and cfg.general:
+        # Set an upper limit on GPU memory usage if specified in the configuration
+        if "gpu_memory_limit" in cfg.general and cfg.general.gpu_memory_limit:
+            set_gpu_memory_limit(cfg.general.gpu_memory_limit)
+            print(f"[INFO] : Setting upper limit of usable GPU memory to {int(cfg.general.gpu_memory_limit)}GBytes.")
+        else:
+            # Warn the user if GPU memory usage is unlimited
+            print("[WARNING] The usable GPU memory is unlimited.\n"
+                "Please consider setting the 'gpu_memory_limit' attribute "
+                "in the 'general' section of your configuration file.")
+
+    # Set a random seed for reproducibility
+    seed = get_random_seed(cfg)
+    print(f'[INFO] : The random seed for this simulation is {seed}')
+    if seed is not None:
+        tf.keras.utils.set_random_seed(seed)
+
+    
 def _torch_specific_initializations(cfg: DictConfig = None) -> None:
     """
     PyTorch-specific initializations.
@@ -298,45 +364,19 @@ def main(cfg: DictConfig) -> None:
     Returns:
         None
     """
+    # Framework agnostic initializations
+    cfg = _fw_agnostic_initializations(cfg)
 
-    # Configure the GPU (the 'general' section may be missing) 
-    if "general" in cfg and cfg.general:
-        # Set upper limit on usable GPU memory
-        if "gpu_memory_limit" in cfg.general and cfg.general.gpu_memory_limit:
-            set_gpu_memory_limit(cfg.general.gpu_memory_limit)
-        else:
-            print("[WARNING] The usable GPU memory is unlimited.\n"
-                "Please consider setting the 'gpu_memory_limit' attribute "
-                "in the 'general' section of your configuration file.")
-
-    # Parse the configuration file
-    cfg = get_config(cfg)
-    cfg.output_dir = HydraConfig.get().runtime.output_dir
-    mlflow_ini(cfg)
-
-    if cfg.model.framework == 'torch': 
-        print (f'[Info]: Torch specific initializations')
+    # Framework specific initializations
+    if cfg.model.framework == "tf":
+        _tf_specific_initializations(cfg)
+    elif cfg.model.framework == "torch":
         _torch_specific_initializations(cfg)
-
-    # Checks if there's a valid ClearML configuration file
-    print(f"[INFO] : ClearML config check")
-    if get_active_config_file() is not None:
-        print(f"[INFO] : ClearML initialization and configuration")
-        # ClearML - Initializing ClearML's Task object.
-        task = Task.init(project_name=cfg.general.project_name,
-                        task_name='od_modelzoo_task')
-        # ClearML - Optional yaml logging
-        task.connect_configuration(name=cfg.operation_mode,
-                                    configuration=cfg)
-
-    # Seed global seed for random generators
-    seed = get_random_seed(cfg)
-    print(f'[INFO] : The random seed for this simulation is {seed}')
-    if seed is not None:
-        tf.keras.utils.set_random_seed(seed)
-
+    else:
+        raise ValueError(f"Invalid framework used: {cfg.model.framework}")
+    
     # The default hardware type is "MCU".
-    process_mode(cfg)
+    _process_mode(cfg)
 
 
 if __name__ == "__main__":

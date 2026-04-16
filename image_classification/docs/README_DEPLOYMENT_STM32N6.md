@@ -8,13 +8,14 @@ This tutorial demonstrates how to deploy a pre-trained image classification mode
   - [1.1 Hardware Setup](#11-hardware-setup)
   - [1.2 Software requirements](#12-software-requirements)
 - [2. Configuration file](#2-configuration-file)
-  - [2.1 Setting the Model and the Operation Mode](#21-setting-the-model-and-the-operation-mode)
-  - [2.2 Dataset configuration](#22-dataset-configuration)
-    - [2.2.1 Dataset info](#221-dataset-info)
-    - [2.2.2 Preprocessing info](#222-preprocessing-info)
-    - [2.2.3 Post processing info](#223-post-processing-info)
-  - [2.3 Deployment parameters](#23-deployment-parameters)
-  - [2.4 Hydra and MLflow settings](#24-hydra-and-mlflow-settings)
+  - [2.1 Download the model](#21-download-the-model)
+  - [2.2 Setting the model and the operation Mode](#22-setting-the-model-and-the-operation-mode)
+  - [2.3 Dataset configuration](#23-dataset-configuration)
+    - [2.3.1 Dataset info](#231-dataset-info)
+    - [2.3.2 Preprocessing info](#232-preprocessing-info)
+    - [2.3.3 Post processing info](#233-post-processing-info)
+  - [2.4 Deployment parameters](#24-deployment-parameters)
+  - [2.5 Hydra and MLflow settings](#25-hydra-and-mlflow-settings)
 - [3. Deployment](#3-deployment)
   - [3.0 Boot modes](#30-boot-modes)
   - [3.1 STM32N6570-DK](#31-stm32n6570-dk)
@@ -47,11 +48,19 @@ __Note__: Camera detected automatically by the firmware, no config required.
 
 To deploy your model, you need to fill a YAML configuration file with your tools and model info, and then launch `stm32ai_main.py`.
 
-As an example, we will show how to deploy [mobilenetv2_a035_128_fft_int8.tflite](https://github.com/STMicroelectronics/stm32ai-modelzoo/tree/master/image_classification/mobilenetv2/ST_pretrainedmodel_public_dataset/tf_flowers/mobilenetv2_a035_128_fft) pre-trained on the tf_flowers dataset using the necessary parameters provided in [mobilenetv2_a035_128_fft_config.yaml](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/image_classification/mobilenetv2/ST_pretrainedmodel_public_dataset/tf_flowers/mobilenetv2_a035_128_fft/mobilenetv2_a035_128_fft_config.yaml). To get this model, clone the [ModelZoo repo](https://github.com/STMicroelectronics/stm32ai-modelzoo/) in the same folder you cloned the [STM32 ModelZoo services repo](https://github.com/STMicroelectronics/stm32ai-modelzoo-services/).
+As an example, we will show how to deploy [mobilenetv2_a035_128_fft_int8.tflite](https://github.com/STMicroelectronics/stm32ai-modelzoo/tree/master/image_classification/mobilenetv2/ST_pretrainedmodel_public_dataset/tf_flowers/mobilenetv2_a035_128_fft) pre-trained on the tf_flowers dataset using the necessary parameters provided in [mobilenetv2_a035_128_fft_config.yaml](https://github.com/STMicroelectronics/stm32ai-modelzoo/blob/master/image_classification/mobilenetv2/ST_pretrainedmodel_public_dataset/tf_flowers/mobilenetv2_a035_128_fft/mobilenetv2_a035_128_fft_config.yaml).
+
+### 2.1 Download the model
+
+To get this model, clone the [ModelZoo repo](https://github.com/STMicroelectronics/stm32ai-modelzoo/) in the same folder you cloned the [STM32 ModelZoo services repo](https://github.com/STMicroelectronics/stm32ai-modelzoo-services/).
+
+```bash
+git clone https://github.com/STMicroelectronics/stm32ai-modelzoo.git --depth 1
+```
+
+### 2.2 Setting the model and the operation Mode
 
 To configure the deployment, edit [`../config_file_examples/deployment_n6_config.yaml`](../config_file_examples/deployment_n6_config.yaml).
-
-### 2.1 Setting the model and the operation Mode
 
 ```yaml
 model:
@@ -65,9 +74,9 @@ Configure the __operation_mode__ section as follow:
 operation_mode: deployment
 ```
 
-### 2.2 Dataset configuration
+### 2.3 Dataset configuration
 
-#### 2.2.1 Dataset info
+#### 2.3.1 Dataset info
 
 Configure the __dataset__ section in the YAML file as follows:
 
@@ -77,7 +86,7 @@ dataset:
   class_names: [daisy, dandelion, roses, sunflowers, tulips]
 ```
 
-#### 2.2.2 Preprocessing info
+#### 2.3.2 Preprocessing info
 
 ```yaml
 preprocessing:
@@ -95,11 +104,11 @@ preprocessing:
   - `rgb`
   - `bgr`
 
-#### 2.2.3 Post processing info
+#### 2.3.3 Post processing info
 
 Image classification use case does not require post processing.
 
-### 2.3 Deployment parameters
+### 2.4 Deployment parameters
 
 To deploy the model in __STM32N6570-DK__ board, you will use:
 
@@ -139,7 +148,7 @@ deployment:
   - `board` __STM32N6570-DK or NUCLEO-N657X0-Q__, see the [README](../../application_code/object_detection/STM32N6/README.md) for more details.
   - `output` __"SPI"__ to use X-NUCLEO-GFX01M2. __"UVCL"__ to use USB/UVC host as display. Only used for __NUCLEO-N657X0-Q__.
 
-### 2.4 Hydra and MLflow settings
+### 2.5 Hydra and MLflow settings
 
 The `mlflow` and `hydra` sections must always be present in the YAML configuration file. The `hydra` section can be used to specify the name of the directory where experiment directories are saved. This pattern allows creating a new experiment directory for each run.
 

@@ -39,7 +39,7 @@ model_path = os.path.join(models_dir_path, 'mobilenet_v1_0.25_96.h5')
 
 # Create STM32AI Class with Cloud Backend, given a username/password and a possible version
 # Version set to "None" will use the latest version available in Developer Cloud
-ai = Stm32Ai(CloudBackend(username, password, version='3.0.0'))
+ai = Stm32Ai(CloudBackend(username, password, version='4.0.0'))
 
 # Two options are available here
 # - Analyze from a local file:

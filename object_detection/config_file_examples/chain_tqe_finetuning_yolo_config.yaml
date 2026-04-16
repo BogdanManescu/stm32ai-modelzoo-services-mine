@@ -16,11 +16,18 @@ model:
 dataset:
   format: pascal_voc
   dataset_name: pascal_voc    
-  class_names: [ aeroplane,bicycle,bird,boat,bottle,bus,car,cat,chair,cow,diningtable,dog,horse,motorbike,person,pottedplant,sheep,sofa,train,tvmonitor ]
-  training_path: ./datasets/Pascal_VOC_2012/train/
-  validation_path: ./datasets/Pascal_VOC_2012/valid/
-  validation_split: 
-  test_path:
+  class_names: [ person ]
+  # Required training split
+  train_images_path: /local/data/mini_od_person/pascal_voc/JPEGImages
+  train_annotations_path: /local/data/mini_od_person/pascal_voc/Annotations/
+  train_split:  /local/data/mini_od_person/pascal_voc/ImageSets/Main/train.txt
+  # Optional validation split
+  val_images_path: /local/data/mini_od_person/pascal_voc/JPEGImages         # usually same as train_images_path
+  val_annotations_path: /local/data/mini_od_person/pascal_voc/Annotations/  # usually same as train_annotations_path
+  val_split:  /local/data/mini_od_person/pascal_voc/ImageSets/Main/val.txt
+  test_images_path: /local/data/mini_od_person/pascal_voc/JPEGImages         # usually same as train_images_path
+  test_annotations_path: /local/data/mini_od_person/pascal_voc/Annotations/  # usually same as train_annotations_path
+  test_split:  /local/data/mini_od_person/pascal_voc/ImageSets/Main/test.txt
   quantization_path: 
   quantization_split: 
 

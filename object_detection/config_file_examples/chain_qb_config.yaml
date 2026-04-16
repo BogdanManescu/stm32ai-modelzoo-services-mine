@@ -8,9 +8,10 @@ model:
 dataset:
    dataset_name: coco
    format: tfs
-   training_path: ./datasets/od_coco_2017_person/train
-   validation_path: ./datasets/od_coco_2017_person/validation
-   test_path: ./datasets/od_coco_2017_person/test
+   val_images_path: /local/data/mini_od_person/tfs/test/images
+   val_annotations_path: /local/data/mini_od_person/tfs/test/annotations
+   test_images_path: /local/data/mini_od_person/tfs/test/images
+   test_annotations_path: /local/data/mini_od_person/tfs/test/annotations
    quantization_path: ./datasets/od_coco_2017_person/quantization
    quantization_split: 0.05
 

@@ -74,6 +74,11 @@ class CProjectDescReader:
             prog_cli = prog_cli[0] if prog_cli else 'NOT FOUND'
             env['STM32CubeProgrammer'] = prog_cli
 
+        if 'arm-none-eabi-objcopy' not in env:
+            prog_cli = STM32Tools().get_objcopy()
+            prog_cli = prog_cli[0] if prog_cli else 'NOT FOUND'
+            env['arm-none-eabi-objcopy'] = prog_cli
+
         if 'STM32SigningTool' not in env:
             prog_cli = STM32Tools().get_cube_signing_tool()
             prog_cli = prog_cli[0] if prog_cli else 'NOT FOUND'
@@ -249,11 +254,12 @@ class STMAiBoardConfig:
         if config_name is None:
             return self._conf
 
-        if config_name not in self.configs():
-            raise STMAICFileError(f'Configuration "{config_name}" not available', idx=4)
+        normalized_configs = [c.replace('_ModelZoo', '') for c in self.configs()]
+        if config_name not in normalized_configs:
+            raise STMAICFileError(f'Configuration "{config_name}" not available, choose one of {normalized_configs}', idx=4)
 
         for conf in self._nn_project.configurations:
-            if conf.name == config_name:
+            if conf.name.replace('_ModelZoo', '') == config_name:
                 self._conf = conf
                 break
 
@@ -281,6 +287,12 @@ class STMAiBoardConfig:
                 pr_f(f'  build_cmd         : {conf_.build_cmd}')
         if hasattr(conf_, 'flash_cmd'):
             pr_f(f'  flash_cmd         : {conf_.flash_cmd}')
+        if hasattr(conf_, 'flash_ecblob_cmd'):
+            pr_f(f'  flash_ecblob_cmd         : {conf_.flash_ecblob_cmd}')
+        if hasattr(conf_, 'extract_ecblob_cmd'):
+            pr_f(f'  extract_ecblob_cmd         : {conf_.extract_ecblob_cmd}')
+        if hasattr(conf_, 'make_binary_cmd'):
+            pr_f(f'  make_binary_cmd         : {conf_.make_binary_cmd}')
         if hasattr(conf_, 'sign_cmd'):
             pr_f(f'  sign_cmd         : {conf_.sign_cmd}')
         if hasattr(conf_, 'flash_network_data_cmd'):

@@ -98,12 +98,12 @@ class IspuTargetDriver(AiRunnerDriver):
                 for j in range(0, len(json_data['sensors'][i]['configuration'])):
                     op = json_data['sensors'][i]['configuration'][j]
                     if 'type' in op and op['type'] == 'write':
-                        addr = op['address'].replace('0x', '');
-                        value = op['data'].replace('0x', '');
+                        addr = op['address'].replace('0x', '')
+                        value = op['data'].replace('0x', '')
                         ucf_bytes.append(int(addr, 16))
                         ucf_bytes.append(int(value, 16))
                     elif 'type' in op and op['type'] == 'delay':
-                        value = op['data'];
+                        value = op['data']
                         ucf_bytes.append(0xFF)
                         ucf_bytes.append(int(value, 10))
         else:
@@ -138,7 +138,7 @@ class IspuTargetDriver(AiRunnerDriver):
         """Connect to the stm.ai run-time"""
         # noqa: DAR101,DAR201,DAR401
 
-        port, rate, ucf = desc.split(":", maxsplit=2)
+        port, rate, device, ucf = desc.split(":", maxsplit=3)
 
         ports = []
         if port == '':
@@ -155,6 +155,7 @@ class IspuTargetDriver(AiRunnerDriver):
 
         bad_fw_version = 0
         fw_version = '0.0.0'
+        no_device = 0
 
         for port in ports:
             try:
@@ -167,8 +168,14 @@ class IspuTargetDriver(AiRunnerDriver):
                     bytesize=serial.EIGHTBITS
                 )
 
+                # send one command to flush the serial buffer
+                ser.write(b'*ver\n')
+                ser.readline()
+
+                # get firmware version
                 ser.write(b'*ver\n')
                 out = ser.readline().decode('utf-8')
+
                 ser.close()
 
                 if out.startswith('ISPU validation firmware'):
@@ -183,8 +190,16 @@ class IspuTargetDriver(AiRunnerDriver):
                     version  = out.split()[3]
                     ver_split = version.split('.')
 
-                    if ver_split[0] != '1' or ver_split[1] != '1':
+                    if ver_split[0] != '1' or ver_split[1] != '2':
                         bad_fw_version = 1
+                        ser.close()
+                        continue
+
+                    cmd = '*device ' + device + '\n'
+                    self.ser.write(bytearray(cmd, encoding='utf-8'))
+                    out = self.ser.readline().decode('utf-8')
+                    if out.startswith('Error'):
+                        no_device = 1
                         ser.close()
                         continue
 
@@ -206,8 +221,10 @@ class IspuTargetDriver(AiRunnerDriver):
             except Exception:
                 pass
 
+        if no_device:
+            raise HwIOError('Detected ISPU validation firmware, but the firmware could not find the requested device.')
         if bad_fw_version:
-            raise HwIOError('Detected ISPU validation firmware version ' + version + '. Please flash a firmware with version 1.1.x.')
+            raise HwIOError('Detected ISPU validation firmware version ' + version + '. Please flash a firmware with version 1.2.x.')
         if port_specified:
             raise HwIOError('No serial device with ISPU validation firmware found on port ' + port + '.')
         else:

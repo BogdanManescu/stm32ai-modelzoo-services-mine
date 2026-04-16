@@ -12,12 +12,11 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 import os
 import csv
-import mlflow
-from typing import Dict, List
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
 import tensorflow as tf
 import logging
+import mlflow
 
 logging.getLogger('tensorflow').setLevel(logging.WARNING)
 

@@ -9,8 +9,9 @@
 
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
-import mlflow
 import tensorflow as tf
+import mlflow
+
 
 from common.utils import count_h5_parameters, log_to_file
 from common.utils.visualize_utils import plot_confusion_matrix

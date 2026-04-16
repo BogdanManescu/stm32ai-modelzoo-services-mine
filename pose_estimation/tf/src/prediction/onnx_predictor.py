@@ -107,8 +107,8 @@ class ONNXModelPredictor:
             predictions = ai_runner_invoke(data, ai_runner_interpreter)
             predictions = ai_interp_outputs_dequant(ai_runner_interpreter, predictions)[0]
 
-        if self.cfg.evaluation:
-            if self.cfg.evaluation.output_chpos=="chfirst" or target == 'host':
+        if self.cfg.prediction:
+            if (target == 'host') and self.cfg.model.model_type not in ["yolo_mpe"]:
                 # Make the transpose chfirst -> chlast
                 if len(predictions.shape)==3:
                     predictions = tf.transpose(predictions,[0,2,1])

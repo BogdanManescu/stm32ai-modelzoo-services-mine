@@ -21,14 +21,11 @@ dataset:
   exclude_unlabeled: true
   download_data: false
   max_detections: 20
-  data_dir: ./datasets/COCO_2017_person/tmp/coco_like/
-  train_images_path: /local/data/OD_datasets/COCO/train2017
-  train_annotations_path: /local/data/OD_datasets/COCO/annotations/person_keypoints_train2017.json
-  val_images_path: /local/data/OD_datasets/COCO/val2017
-  val_annotations_path: /local/data/OD_datasets/COCO/annotations/person_keypoints_val2017.json
-  training_path: ./datasets/COCO_2017_person/tmp/coco_like/train
-  validation_split: 0.1
-  test_path: ./datasets/COCO_2017_person/tmp/coco_like/test
+  train_images_path: /local/data/mini_od_person/coco/train2017
+  train_annotations_path: /local/data/mini_od_person/coco/annotations/person_train2017.json
+  val_images_path: /local/data/mini_od_person/coco/val2017
+  val_annotations_path: /local/data/mini_od_person/coco/annotations/person_val2017.json
+  #validation_split: 0.1
 
 preprocessing:
   rescaling:

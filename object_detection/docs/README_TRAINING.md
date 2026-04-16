@@ -26,8 +26,7 @@ dataset_directory/
 ......val_image_2.txt
 ```
 
-Please note that YOLO Darknet only supports this specific directory structure for the dataset, and other formats are not
-compatible.
+Please note that YOLO Darknet only supports this specific directory structure for the dataset, and other formats are not compatible.
 
 </details>
 <details open><summary><a href="#2"><b>2. Create your training configuration file</b></a></summary><a id="2"></a>
@@ -127,6 +126,7 @@ The exhaustive list of `model_type` and corresponding `model_name` is the follow
 |-----------------------|----------------------|
 | `yolov8n`             | X         |
 | `yolov11n`            | X         |
+| `yolo26n`             | X         |
 | `yolov5u`             | X         |
 | `st_yoloxn`           | `st_yoloxn`, `st_yoloxn_d033_w025`, `st_yoloxn_d100_w025`, `st_yoloxn_d050_w040`        |
 | `st_yololcv1`         | `st_yololcv1`|
@@ -148,12 +148,19 @@ Information about the dataset you want to use is provided in the `dataset` secti
 ```yaml
 dataset:
   format: pascal_voc
-  dataset_name: pascal_voc                                    # Dataset name. Optional, defaults to "<unnamed>".
+  dataset_name: pascal_voc                                    # Dataset name. Defaults to "<unnamed>".
   class_names: [ aeroplane,bicycle,bird,boat,bottle,bus,car,cat,chair,cow,diningtable,dog,horse,motorbike,person,pottedplant,sheep,sofa,train,tvmonitor ] # Names of the classes in the dataset.
-  training_path: <training-set-root-directory>               # Path to the root directory of the training set.
-  validation_path: <validation-set-root-directory>           # Path to the root directory of the validation set.
-  validation_split: 0.2                                      # Training/validation sets split ratio.
-  test_path: <test-set-root-directory>                       # Path to the root directory of the test set.
+  data_dir: <tmp-directory-where-tfs-will-be-saved>          # Path to the tmp directory before the split.
+  train_images_path: <JPEGImages-root-directory>             # Path to the root directory of the img before split.
+  train_annotations_path: <path-to-the-Annotations-dir>      # Path to the root directory of the xml annotations
+  val_images_path: <JPEGImages-root-directory>               # Path to the root directory of the img (usually the same as train_images_path).
+  val_annotations_path: <path-to-the-Annotations-dir>        # Path to the root directory of the xml annotations (usually the same as train_annotations_path)
+  test_images_path: <JPEGImages-root-directory>              # Path to the root directory of the img (usually the same as train_images_path).
+  test_annotations_path: <path-to-the-Annotations-dir>       # Path to the root directory of the xml annotations (usually the same as train_annotations_path)
+  train_split:  <path-to-the-ImageSets/Main/train.txt>       # Path to the .txt file containing the split for training.
+  val_split:  <path-to-the-ImageSets/Main/val.txt>           # Path to the .txt file containing the split for training. (Optional)
+  test_split:  <path-to-the-ImageSets/Main/test.txt>         # Path to the .txt file containing the split for training. (Optional)
+  # validation_split: 0.2                                    # Training/validation sets split ratio. (Optional if val_*_path is defined)
   quantization_path: <quantization-set-root-directory>       # Path to the root directory of the quantization set.
   quantization_split:                                        # Quantization split ratio.
   seed: 123                                                  # Random generator seed used when splitting a dataset.
@@ -165,12 +172,11 @@ The state machine below describes the rules to follow when handling dataset path
 ![plot](../../common/doc/img/state_machine_training.JPG)
 </div>
 
-If a validation set path is not provided, the available data under the training_path directory is automatically split into a training set and a validation set. By default, the split ratio is 80:20, with 80% of the data used for training and 20% used for validation. However, you can customize the split ratio by specifying the percentage to be used for the validation set in the `validation_split` parameter. This allows you to adjust the size of the validation set based on the size of your dataset and the level of accuracy you want to achieve.
+If a validation set path is not provided, the available data under the train_images_path/train_annotations_path directories is automatically split into a training set and a validation set. By default, the split ratio is 80:20, with 80% of the data used for training and 20% used for validation. However, you can customize the split ratio by specifying the percentage to be used for the validation set in the `validation_split` parameter. This allows you to adjust the size of the validation set based on the size of your dataset and the level of accuracy you want to achieve.
 
 It is important to note that having a validation set is crucial for evaluating the performance of your model during training and preventing overfitting.
 
-If a `test_path` is not provided to evaluate the model accuracy after training and quantization, the validation set is used as the test set by default. This means that the model's performance on the validation set during training will serve as an estimate of its accuracy on unseen data. However, it is generally recommended to use a separate test set to evaluate the model's performance after training and quantization, as this provides a more reliable estimate of its
-accuracy on new data. Using a separate test set also helps to ensure that the model has not overfit to the validation set during training.
+If a `test_images_path` and `test_annotations_path` are not provided to evaluate the model accuracy after training and quantization, the validation set is used as the test set by default. This means that the model's performance on the validation set during training will serve as an estimate of its accuracy on unseen data. However, it is generally recommended to use a separate test set to evaluate the model's performance after training and quantization, as this provides a more reliable estimate of its accuracy on new data. Using a separate test set also helps to ensure that the model has not overfit to the validation set during training.
 
 </details></ul>
 <ul><details open><summary><a href="#2-5">2.5 Dataset preprocessing</a></summary><a id="2-5"></a>
@@ -346,7 +352,7 @@ mlflow:
 To launch your model training using a real dataset, run the following command from the **src/** folder:
 
 ```bash
-python stm32ai_main.py --config-path ./config_file_examples/ --config-name training_config.yaml
+python stm32ai_main.py --config-path ./config_file_examples/ --config-name training_config_pascal_voc.yaml
 ```
 
 The trained .keras model can be found in the corresponding **experiments_outputs/** folder.
@@ -401,9 +407,11 @@ model:
 dataset:
   format: tfs
   dataset_name: coco
-  training_path: <training-set-root-directory>
+  train_images_path: <training-set-root-directory>
+  train_annotations_path: <training-set-root-directory>
   validation_split: 0.2
-  test_path: <test-set-root-directory>
+  test_images_path: <test-set-root-directory>
+  test_annotations_path: <test-set-root-directory>
 
 training:
   batch_size: 64

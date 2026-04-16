@@ -9,9 +9,9 @@
 
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
+import tensorflow as tf
 import mlflow
 import numpy as np
-import tensorflow as tf
 from sklearn.metrics import accuracy_score, confusion_matrix
 
 from common.utils import log_to_file

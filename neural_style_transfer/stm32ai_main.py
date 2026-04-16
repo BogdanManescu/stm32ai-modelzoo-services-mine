@@ -15,7 +15,6 @@ import tensorflow as tf
 from omegaconf import DictConfig
 import mlflow
 import argparse
-from typing import Optional
 from clearml import Task
 from clearml.backend_config.defs import get_active_config_file
 

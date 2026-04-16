@@ -30,7 +30,7 @@ password = os.environ.get('STM32AI_PASSWORD', None)
 
 # Create STM32AI Class with Cloud Backend, given a username/password and a possible version
 # Version set to "None" will use the latest version available in Developer Cloud
-ai = Stm32Ai(CloudBackend(username, password, version='3.0.0'))
+ai = Stm32Ai(CloudBackend(username, password, version='4.0.0'))
 
 # Get model from "models" folder
 models_dir_path = '../models'

@@ -6,15 +6,13 @@
 #  * the root directory of this software component.
 #  * If no LICENSE file comes with this software, it is provided AS-IS.
 #  *--------------------------------------------------------------------------------------------*/
-import sys
 import os
 import tqdm
-import mlflow
 import numpy as np
 import tensorflow as tf
+import mlflow
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
-from typing import Optional
 
 from common.utils import log_to_file, ai_runner_interp, ai_interp_input_quant, ai_interp_outputs_dequant
 from pose_estimation.tf.src.postprocessing import spe_postprocess, heatmaps_spe_postprocess, yolo_mpe_postprocess

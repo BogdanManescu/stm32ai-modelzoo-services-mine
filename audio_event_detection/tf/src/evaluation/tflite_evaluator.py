@@ -9,9 +9,9 @@
 
 import os
 import warnings
+import tensorflow as tf
 import mlflow
 import numpy as np
-import tensorflow as tf
 import tqdm
 from omegaconf import DictConfig
 from common.utils import tf_dataset_to_np_array, plot_confusion_matrix, log_to_file, compute_confusion_matrix2

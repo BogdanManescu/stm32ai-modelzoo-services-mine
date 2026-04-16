@@ -37,13 +37,13 @@ def parse_dataset_section(cfg: DictConfig, mode: str = None,
         "max_detections",
         "train_images_path",
         "val_images_path",
+        "test_images_path",
         "train_annotations_path",
         "val_annotations_path",
-        "train_xml_dir",
-        "val_xml_dir",
-        "train_split", 
-        "test_split",
+        "test_annotations_path",
+        "train_split",
         "val_split",
+        "test_split",
         "data_dir",
         "training_path",
         "validation_path",
@@ -67,17 +67,16 @@ def parse_dataset_section(cfg: DictConfig, mode: str = None,
 
     # Define required fields based on mode
     if mode in mode_groups.training:
-        required += ["training_path"]
         required += ["format"]
     elif mode in mode_groups.evaluation:
-        one_or_more += ["training_path", "test_path"]
+        required += ["format"]
     elif mode == "prediction":
         required += ["prediction_path"]
 
     # Validate config keys and required attributes
     check_config_attributes(cfg, specs={"legal": legal, "all": required, "one_or_more": one_or_more},
                             section="dataset")
-    
+
     def _contains_images(dir_path):
         if not os.path.isdir(dir_path):
             return False
@@ -85,7 +84,7 @@ def parse_dataset_section(cfg: DictConfig, mode: str = None,
         for ext in ("*.jpg", "*.jpeg", "*.png"):
             image_files.extend(glob.glob(os.path.join(dir_path, ext)))
         return len(image_files) > 0
-    
+
     # Enforce dataset.format presence if mode is in training and evaluation group
     if mode in mode_groups.training:
         fmt = getattr(cfg, "format", None)
@@ -95,34 +94,35 @@ def parse_dataset_section(cfg: DictConfig, mode: str = None,
 
         # Additional check for 'tfs' format
         if dataset_format == "tfs":
-            training_path = getattr(cfg, "training_path", None)
-            if training_path is None:
-                raise ValueError("For 'tfs' format in training mode, 'training_path' must be defined in dataset section.")
+            if not getattr(cfg, "train_images_path", None):
+                raise ValueError("For TFS format, 'train_images_path' must be defined in dataset section.")
+            if not getattr(cfg, "train_annotations_path", None):
+                raise ValueError("For tfs format, 'train_annotations_path' must be defined in dataset section.")
 
-            if not os.path.isdir(training_path):
-                raise ValueError(f"'training_path' directory '{training_path}' does not exist or is not a directory.")
-
+            train_images_path = getattr(cfg, "train_images_path", None)
+            train_annotations_path = getattr(cfg, "train_annotations_path", None)
             # Helper to find matching .jpg and .tfs files
-            def _check_tfs_pairs(dir_path):
-                jpg_files = set(os.path.splitext(f)[0] for f in os.listdir(dir_path) if f.lower().endswith(".jpg"))
-                tfs_files = set(os.path.splitext(f)[0] for f in os.listdir(dir_path) if f.lower().endswith(".tfs"))
+            def _check_tfs_pairs(images_dir_path, annotations_dir_path):
+                jpg_files = set(os.path.splitext(f)[0] for f in os.listdir(images_dir_path) if f.lower().endswith(".jpg"))
+                tfs_files = set(os.path.splitext(f)[0] for f in os.listdir(annotations_dir_path) if f.lower().endswith(".tfs"))
                 missing_pairs = jpg_files.symmetric_difference(tfs_files)
                 return missing_pairs
 
-            missing_pairs = _check_tfs_pairs(training_path)
+            missing_pairs = _check_tfs_pairs(train_images_path, train_annotations_path)
             if missing_pairs:
-                warnings.warn(f"'training_path' directory '{training_path}' must contain matching .jpg and .tfs files for each sample. Missing pairs: {missing_pairs}",
+                warnings.warn(f"'train images and annotations directories must contain matching .jpg and .tfs files for each sample. \n Missing pairs: {missing_pairs}",
                     UserWarning)
                 
             # Optional check for test_path
-            test_path = getattr(cfg, "test_path", None)
-            if test_path is not None:
-                if not os.path.isdir(test_path):
-                    warnings.warn(f"'test_path' directory '{test_path}' does not exist or is not a directory.")
+            val_images_path = getattr(cfg, "val_images_path", None)
+            val_annotations_path = getattr(cfg, "val_annotations_path", None)
+            if val_images_path is not None:
+                if not os.path.isdir(val_images_path):
+                    warnings.warn(f"'val_images_path' directory '{val_images_path}' does not exist or is not a directory.")
                 else:
-                    missing_pairs_test = _check_tfs_pairs(test_path)
+                    missing_pairs_test = _check_tfs_pairs(val_images_path, val_annotations_path)
                     if missing_pairs_test:
-                        warnings.warn(f"'test_path' directory '{test_path}' does not have matching .jpg and .tfs files for each sample. Missing pairs: {missing_pairs_test}")
+                        warnings.warn(f"'val_images_path' and 'val_annotations_path' directories does not have matching .jpg and .tfs files for each sample. \n Missing pairs: {missing_pairs_test}")
 
         if dataset_format == "coco":
             # Check required paths
@@ -139,78 +139,148 @@ def parse_dataset_section(cfg: DictConfig, mode: str = None,
             train_ann_path = cfg.train_annotations_path
             if not (os.path.isfile(train_ann_path) and train_ann_path.lower().endswith(".json")):
                 raise ValueError(f"Training annotations path '{train_ann_path}' is not a valid JSON file.")
-
-            # Validate JSON file can be loaded
             try:
-                with open(train_ann_path, 'r') as f:
+                with open(train_ann_path, "r") as f:
                     json.load(f)
             except Exception as e:
                 raise ValueError(f"Training annotation JSON file '{train_ann_path}' could not be loaded: {e}")
 
-            # Optional val paths with warnings
+            # Optional validation paths
             val_images_path = getattr(cfg, "val_images_path", None)
             val_annotations_path = getattr(cfg, "val_annotations_path", None)
-            if val_images_path is None or not _contains_images(val_images_path):
+            if val_images_path is not None and not _contains_images(val_images_path):
                 warnings.warn(f"Validation images path '{val_images_path}' is missing or does not contain images.")
-            if val_annotations_path is None or not (os.path.isfile(val_annotations_path) and val_annotations_path.lower().endswith(".json")):
+            if val_annotations_path is not None and not (os.path.isfile(val_annotations_path) and val_annotations_path.lower().endswith(".json")):
                 warnings.warn(f"Validation annotations path '{val_annotations_path}' is missing or not a valid JSON file.")
 
+            # Optional test paths
+            test_images_path = getattr(cfg, "test_images_path", None)
+            test_annotations_path = getattr(cfg, "test_annotations_path", None)
+            if test_images_path is not None and not _contains_images(test_images_path):
+                warnings.warn(f"Test images path '{test_images_path}' is missing or does not contain images.")
+            if test_annotations_path is not None and not (os.path.isfile(test_annotations_path) and test_annotations_path.lower().endswith(".json")):
+                warnings.warn(f"Test annotations path '{test_annotations_path}' is missing or not a valid JSON file.")        
+
         elif dataset_format == "pascal_voc":
-            # Check required paths
+            # Required source paths
             if not getattr(cfg, "train_images_path", None):
                 raise ValueError("For Pascal VOC format, 'train_images_path' must be defined in dataset section.")
-            if not getattr(cfg, "train_xml_dir", None):
-                raise ValueError("For Pascal VOC format, 'train_xml_dir' must be defined in dataset section.")
+            if not getattr(cfg, "train_annotations_path", None):
+                raise ValueError("For Pascal VOC format, 'train_annotations_path' must be defined in dataset section.")
+            if not getattr(cfg, "train_split", None):
+                raise ValueError("For Pascal VOC format, 'train_split' must be defined in dataset section.")
 
-            # Check train images directory
             if not _contains_images(cfg.train_images_path):
-                raise ValueError(f"Training images directory '{cfg.train_images_path}' does not contain any jpg/jpeg/png images.")
+                raise ValueError(
+                    f"Training images directory '{cfg.train_images_path}' does not contain any jpg/jpeg/png images."
+                )
 
-            # Check train xml directory
-            train_xml_dir = cfg.train_xml_dir
-            if not os.path.isdir(train_xml_dir):
-                raise ValueError(f"Training XML directory '{train_xml_dir}' does not exist or is not a directory.")
+            train_ann_dir = cfg.train_annotations_path
+            if not os.path.isdir(train_ann_dir):
+                raise ValueError(
+                    f"Training annotations directory '{train_ann_dir}' does not exist or is not a directory."
+                )
+            if not os.path.isfile(cfg.train_split):
+                raise ValueError(
+                    f"Training split file '{cfg.train_split}' does not exist."
+                )
 
-            # Count images and xml files and compare
-            image_count = 0
-            for ext in ("*.jpg", "*.jpeg", "*.png"):
-                image_count += len(glob.glob(os.path.join(cfg.train_images_path, ext)))
-            xml_count = len(glob.glob(os.path.join(train_xml_dir, "*.xml")))
-            if image_count != xml_count:
-                raise ValueError(f"Number of images ({image_count}) and XML annotation files ({xml_count}) in training set do not match.")
-
-            # Optional val paths with warnings
+            # Optional val paths
             val_images_path = getattr(cfg, "val_images_path", None)
-            val_xml_dir = getattr(cfg, "val_xml_dir", None)
-            if val_images_path is None or not _contains_images(val_images_path):
-                warnings.warn(f"Validation images path '{val_images_path}' is missing or does not contain images.")
-            if val_xml_dir is None or not os.path.isdir(val_xml_dir):
-                warnings.warn(f"Validation XML directory '{val_xml_dir}' is missing or not a directory.")
-            else:
-                val_image_count = 0
-                for ext in ("*.jpg", "*.jpeg", "*.png"):
-                    val_image_count += len(glob.glob(os.path.join(val_images_path, ext))) if val_images_path else 0
-                val_xml_count = len(glob.glob(os.path.join(val_xml_dir, "*.xml")))
-                if val_images_path and val_image_count != val_xml_count:
-                    warnings.warn(f"Number of validation images ({val_image_count}) and XML files ({val_xml_count}) do not match.")
+            val_annotations_path = getattr(cfg, "val_annotations_path", None)
+            val_split = getattr(cfg, "val_split", None)
+
+            if val_images_path is not None and not _contains_images(val_images_path):
+                warnings.warn(
+                    f"Validation images path '{val_images_path}' is missing or does not contain images.",
+                    UserWarning,
+                )
+
+            if val_annotations_path is not None and not os.path.isdir(val_annotations_path):
+                warnings.warn(
+                    f"Validation annotations directory '{val_annotations_path}' is missing or not a directory.",
+                    UserWarning,
+                )
+
+            if val_split is not None and not os.path.isfile(val_split):
+                warnings.warn(
+                    f"Validation split file '{val_split}' is missing or does not exist.",
+                    UserWarning,
+                )
+
+            # Optional test paths
+            test_images_path = getattr(cfg, "test_images_path", None)
+            test_annotations_path = getattr(cfg, "test_annotations_path", None)
+            test_split = getattr(cfg, "test_split", None)
+
+            if test_images_path is not None and not _contains_images(test_images_path):
+                warnings.warn(
+                    f"Test images path '{test_images_path}' is defined but does not contain images.",
+                    UserWarning,
+                )
+
+            if test_annotations_path is not None and not os.path.isdir(test_annotations_path):
+                warnings.warn(
+                    f"Test annotations directory '{test_annotations_path}' is defined but not a directory.",
+                    UserWarning,
+                )
+
+            if test_split is not None and not os.path.isfile(test_split):
+                warnings.warn(
+                    f"Test split file '{test_split}' is defined but does not exist.",
+                    UserWarning,
+                )
 
         elif dataset_format == "darknet_yolo":
-            # Check data_dir
-            if not getattr(cfg, "data_dir", None):
-                raise ValueError("For Darknet YOLO format, 'data_dir' must be defined in dataset section.")
+            train_images_path = getattr(cfg, "train_images_path", None)
+            train_annotations_path = getattr(cfg, "train_annotations_path", None)
 
-            data_dir = cfg.data_dir
-            if not os.path.isdir(data_dir):
-                raise ValueError(f"data_dir '{data_dir}' is not a valid directory.")
+            if not train_images_path or not os.path.isdir(train_images_path):
+                raise ValueError(
+                    "For Darknet YOLO format, 'train_images_path' must be defined and point to a valid directory."
+                )
 
-            # Check images presence
-            if not _contains_images(data_dir):
-                raise ValueError(f"data_dir '{data_dir}' does not contain any jpg/jpeg/png images.")
+            if not train_annotations_path or not os.path.isdir(train_annotations_path):
+                raise ValueError(
+                    "For Darknet YOLO format, 'train_annotations_path' must be defined and point to a valid directory."
+                )
 
-            # Check xml files presence
-            xml_files = glob.glob(os.path.join(data_dir, "*.txt"))
-            if len(xml_files) == 0:
-                raise ValueError(f"data_dir '{data_dir}' does not contain any XTXTML annotation files.")
+            # Optional explicit validation
+            val_images_path = getattr(cfg, "val_images_path", None)
+            val_annotations_path = getattr(cfg, "val_annotations_path", None)
+            if (val_images_path is None) ^ (val_annotations_path is None):
+                raise ValueError(
+                    "For Darknet YOLO format, if one of 'val_images_path' or 'val_annotations_path' is defined, "
+                    "the other must also be defined."
+                )
+            if val_images_path and not os.path.isdir(val_images_path):
+                raise ValueError("For Darknet YOLO format, 'val_images_path' must point to a valid directory.")
+            if val_annotations_path and not os.path.isdir(val_annotations_path):
+                raise ValueError("For Darknet YOLO format, 'val_annotations_path' must point to a valid directory.")
+
+            # Required test paths when evaluation mode is used
+            if mode in mode_groups.evaluation:
+                test_images_path = getattr(cfg, "test_images_path", None)
+                test_annotations_path = getattr(cfg, "test_annotations_path", None)
+
+                if not test_images_path or not os.path.isdir(test_images_path):
+                    raise ValueError("For Darknet YOLO format in evaluation mode, 'test_images_path' must be defined and point to a valid directory.")
+
+                if not test_annotations_path or not os.path.isdir(test_annotations_path):
+                    raise ValueError("For Darknet YOLO format in evaluation mode, 'test_annotations_path' must be defined and point to a valid directory.")
+            else:
+                # Optional explicit test for non-evaluation modes
+                test_images_path = getattr(cfg, "test_images_path", None)
+                test_annotations_path = getattr(cfg, "test_annotations_path", None)
+                if (test_images_path is None) ^ (test_annotations_path is None):
+                    raise ValueError(
+                        "For Darknet YOLO format, if one of 'test_images_path' or 'test_annotations_path' is defined, "
+                        "the other must also be defined."
+                    )
+                if test_images_path and not os.path.isdir(test_images_path):
+                    raise ValueError("For Darknet YOLO format, 'test_images_path' must point to a valid directory.")
+                if test_annotations_path and not os.path.isdir(test_annotations_path):
+                    raise ValueError("For Darknet YOLO format, 'test_annotations_path' must point to a valid directory.")
 
         else:
             # For now, do not support KITTI or other formats
@@ -300,7 +370,7 @@ def parse_preprocessing_section(cfg: DictConfig,
                          f"Received {cfg.resizing.aspect_ratio}\n"
                          "Please check the `resizing.aspect_ratio` attribute in "
                          "the 'preprocessing' section of your configuration file.")
-                         
+
     # Check resizing interpolation value
     interpolation_methods = ["bilinear", "nearest", "area", "lanczos3", "lanczos5", "bicubic", "gaussian",
                              "mitchellcubic"]
@@ -501,7 +571,7 @@ def get_config(config_data: DictConfig) -> DefaultMunch:
         model_path_used = bool(cfg.model.model_path)
         model_type_used = bool(cfg.model.model_type)
         legal = ["batch_size", "epochs", "optimizer", "dropout", "frozen_layers",
-                "callbacks", "dryrun"]
+                "callbacks", "resume_training", "dryrun"]
         
         legal_pt = ["trainer_name", "batch_size", "warmup_epochs", "max_epoch", "warmup_lr", "min_lr_ratio", 
          "basic_lr_per_img", "scheduler", "no_aug_epochs", "ema", "weight_decay", 

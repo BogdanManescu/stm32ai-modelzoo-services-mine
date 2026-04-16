@@ -146,6 +146,8 @@ def gen_h_user_file(config):
         f.write('#define CTRL_X_CUBE_AI_SPECTROGRAM_MEL_START_IDX (user_melFiltersStartIndices)\n')
         f.write('#define CTRL_X_CUBE_AI_SPECTROGRAM_MEL_STOP_IDX  (user_melFiltersStopIndices)\n')
         f.write('#define CTRL_X_CUBE_AI_OOD_THR                   ({}F)\n'.format(config.deployment.unknown_class_threshold))
+        if config.deployment.hardware_setup.serie == "STM32U3" or config.deployment.hardware_setup.board == "NUCLEO-U3C5ZI-Q":
+            f.write(('#define CTRL_X_CUBE_AI_MODEL_NO_TRANSPOSE (0) \n'))
         f.write('#define CTRL_SEQUENCE                            {CTRL_CMD_PARAM_AI,0}\n')
         f.write('\n')
         f.write('#ifdef __cplusplus\n')

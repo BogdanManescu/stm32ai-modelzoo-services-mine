@@ -24,14 +24,19 @@ def prepare_kwargs_for_dataloader(cfg):
     """
     input_shape = getattr(cfg.model, 'input_shape', None)
     model_path = cfg.model.model_path
-    file_extension = str(model_path).split('.')[-1]
-    input_shape = cfg.model.input_shape
-    if file_extension in ['h5', 'keras']:
+
+    # If no model_path, use input_shape directly (for data augmentation demos)
+    if model_path is None:
         image_size = tuple(input_shape)[:-1]
-    elif file_extension == 'tflite':
-        image_size = tuple(input_shape)[-3:-1]
-    elif file_extension == 'onnx':
-        image_size = tuple(input_shape)[-2:]
+    else:
+        file_extension = str(model_path).split('.')[-1]
+        input_shape = cfg.model.input_shape
+        if file_extension in ['h5', 'keras']:
+            image_size = tuple(input_shape)[:-1]
+        elif file_extension == 'tflite':
+            image_size = tuple(input_shape)[-3:-1]
+        elif file_extension == 'onnx':
+            image_size = tuple(input_shape)[-2:]
 
     # if the random_periodic_resizing data-aug is set, the training image is imported at the maximum possible res to avoid losing information when resizing
     if cfg.data_augmentation is not None:

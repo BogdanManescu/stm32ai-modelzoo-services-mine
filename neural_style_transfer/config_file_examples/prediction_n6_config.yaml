@@ -37,7 +37,7 @@ postprocessing:
 
 tools:
    stedgeai:
-      path_to_stedgeai: C:/ST/STEdgeAI/3.0/Utilities/windows/stedgeai.exe
+      path_to_stedgeai: C:/ST/STEdgeAI/4.0/Utilities/windows/stedgeai.exe
 
 mlflow:
    uri: ./tf/src/experiments_outputs/mlruns

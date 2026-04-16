@@ -22,6 +22,7 @@ from .ai_runner import AiRunner, AiRunnerDriver, AiHwDriver, STAI_INFO_DICT_VERS
 from .ai_runner import HwIOError, InvalidMsgError, NotInitializedMsgError, AiRunnerError
 from .ai_runner import InvalidParamError, InvalidModelError
 from .stm32_utility import stm32_id_to_str, stm32_attr_config, bsdchecksum, dump_ihex_file
+from .stellar_utility import stellar_id_to_str
 from . import stm32msg_pb2 as stm32msg
 from .stm_ai_utils import stm_ai_node_type_to_str, AiBufferFormat, IOTensor
 from .stm_ai_utils import RT_ST_AI_NAME, st_neural_art_node_type_to_str
@@ -339,6 +340,10 @@ class DeviceDecoder():
         """."""
         return self.get_dev_id() in [0x486, 0x47B] # 0x486: N6 / 0x47B: H7P
 
+    def _is_stellar_npu(self):
+        """."""
+        return self.get_dev_id() in [0x2663] # 0x2663: P3E
+
     def family(self) -> str:
         """Return family description"""  # noqa: DAR101,DAR201,DAR401
         return 'stellar' if self._is_stellar_family() else 'stm32'
@@ -362,13 +367,13 @@ class DeviceDecoder():
     def get_attrs(self) -> List[str]:
         """Return the device settings"""  # noqa: DAR101,DAR201,DAR401
         attrs_ = stm32_attr_config(self._sys_info_msg.cache)
-        if self._is_stm32_npu() and self._config:
+        if self._is_stm32_npu() or self._is_stellar_npu() and self._config:
             npu_cache = int(self._config.get('npu_cache', '0'))
             attrs_.append(f'npu_cache={npu_cache}')
             for key, val in self._config.items():
                 if 'freq' in key:
                     attrs_.append(f'{key}={int(int(val) / 1000000)}MHz')
-        elif self._is_stm32_npu() and hasattr(self._sys_info_msg, 'extra'):
+        elif self._is_stm32_npu() or self._is_stellar_npu() and hasattr(self._sys_info_msg, 'extra'):
             attrs_.append(f'npu_freq={int(self._sys_info_msg.extra[1] / 1000000)}MHz')
             attrs_.append(f'nic_freq={int(self._sys_info_msg.extra[2] / 1000000)}MHz')
         return attrs_
@@ -380,7 +385,10 @@ class DeviceDecoder():
     def get_desc(self) -> str:
         """Return short description of the device settings"""  # noqa: DAR101,DAR201,DAR401
         desc_ = self.family() + ' family - '
-        desc_ += stm32_id_to_str(self._sys_info_msg.devid)
+        if self.family() == 'stellar':
+            desc_ += stellar_id_to_str(self.get_dev_id())
+        else:
+            desc_ += stm32_id_to_str(self.get_dev_id())
         desc_ += f' @{self._sys_info_msg.sclock / 1000000:.0f}/'
         desc_ += f'{self._sys_info_msg.hclock / 1000000:.0f}MHz'
         return desc_
@@ -389,7 +397,10 @@ class DeviceDecoder():
         """Save the config info from the 's:' message"""
         self._s_msgs = [msg_.replace('s:config:','') for msg_ in s_msgs]
         self._s_msgs.append(f'dev_family:{self.family()}')
-        self._s_msgs.append(f'dev_desc:{stm32_id_to_str(self.get_dev_id())}')
+        if self.family() == 'stellar':
+            self._s_msgs.append(f'dev_desc:{stellar_id_to_str(self.get_dev_id())}')
+        else:
+            self._s_msgs.append(f'dev_desc:{stm32_id_to_str(self.get_dev_id())}')
         for s_msg_ in s_msgs:
             tokens_ = s_msg_.split(':')
             if len(tokens_) > 3 and tokens_[0] == 's' and tokens_[1] == 'config':

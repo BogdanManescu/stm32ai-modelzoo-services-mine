@@ -10,7 +10,6 @@
 # Import necessary libraries
 import os
 import warnings
-import mlflow
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
 import numpy as np
@@ -19,6 +18,7 @@ import numpy as np
 warnings.filterwarnings("ignore")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
+import mlflow
 import tqdm
 
 from semantic_segmentation.tf.src.evaluation import prediction_accuracy_on_batch, iou_per_class

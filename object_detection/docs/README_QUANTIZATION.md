@@ -15,10 +15,11 @@ Information about the dataset you want to use for activations calibration is pro
 
 ```yaml
 dataset:
-  format: tfs
+  format: coco
   dataset_name: coco
   class_names: [ person ]
-  test_path:
+  test_images_path: ./datasets/COCO_2017_person/val_2017
+  test_images_path: ./datasets/COCO_2017_person/annotations/person_val2017.json
   quantization_path: ./datasets/COCO_2017_person
   quantization_split: 0.4
   seed: 0
@@ -87,7 +88,7 @@ quantization:
 </details></ul>
 <ul><details open><summary><a href="#1-4">1.4 Random quantization</a></summary><a id="1-4"></a>
 
-When no path is specified in either `quantization_path` or `training_path`, the model is quantized after calibration on random data. There is no interest in evaluating the accuracy in this case. However, this random quantization can be useful to quickly estimate the model footprints on a target after quantization. We will see how to proceed in the next section.
+When no path is specified in either `quantization_path` or `train_images_path`/`train_annotations_path`, the model is quantized after calibration on random data. There is no interest in evaluating the accuracy in this case. However, this random quantization can be useful to quickly estimate the model footprints on a target after quantization. We will see how to proceed in the next section.
 
 </details></ul>
 <ul><details open><summary><a href="#1-5">1.5 Hydra and MLflow settings</a></summary><a id="1-5"></a>

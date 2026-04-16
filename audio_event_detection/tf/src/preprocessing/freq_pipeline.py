@@ -12,8 +12,6 @@
 import librosa
 import numpy as np
 import warnings
-import torch
-import torch.nn as nn
 
 class LibrosaSpecPipeline:
     """Wrapper around the Librosa STFT function.

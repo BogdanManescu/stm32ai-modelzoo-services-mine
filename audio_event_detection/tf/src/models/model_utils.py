@@ -16,9 +16,7 @@ def prepare_kwargs_for_model(cfg: DictConfig):
 
     model_kwargs = {
         'model_path': getattr(cfg.model, 'model_path', None),
-        'alpha': getattr(cfg.model, 'alpha', None),
         'model_type': getattr(cfg.model, 'model_type', None),
-        'depth': getattr(cfg.model, 'depth', None),
         'input_shape': getattr(cfg.model, 'input_shape', None),
         'pretrained': getattr(cfg.model, 'pretrained', None),
         'dropout': getattr(cfg.training, 'dropout', None),
@@ -28,6 +26,7 @@ def prepare_kwargs_for_model(cfg: DictConfig):
         'num_classes': getattr(cfg.dataset, 'num_classes', None),
         'patch_length': getattr(cfg.feature_extraction, 'patch_length', None),
         'n_mels': getattr(cfg.feature_extraction, 'n_mels', None),
+        'fine_tune': getattr(cfg.training, 'fine_tune', None),
         "activity_regularizer": None,
         "kernel_regularizer": None,
 

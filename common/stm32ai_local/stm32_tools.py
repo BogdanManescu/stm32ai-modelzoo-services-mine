@@ -49,6 +49,7 @@ class STM32Tools:
     MAKE = 'make'
     MAKE_ALT = 'mingw32-make'
     GCC_COMPILER = 'arm-none-eabi-gcc'
+    OBJCOPY = 'arm-none-eabi-objcopy'
     CUBE_PROGRAMMER = 'STM32_Programmer_CLI'
     CUBE_SIGNING_TOOL = 'STM32_SigningTool_CLI'
 
@@ -57,6 +58,7 @@ class STM32Tools:
 
         self._cube_ide_drv = _get_app(STM32Tools.CUBE_IDE, 'STM32_CUBE_IDE_EXE')
         self._gcc_compiler = _get_app(STM32Tools.GCC_COMPILER, 'STM32_ARM_GCC_COMPILER_EXE')
+        self._objcopy = _get_app(STM32Tools.OBJCOPY, 'STM32_ARM_OBJCOPY_EXE')
         self._make = _get_app(STM32Tools.MAKE, 'STM32_MAKE_EXE')
         if not self._make:
             self._make = _get_app(STM32Tools.MAKE_ALT, '')
@@ -105,6 +107,12 @@ class STM32Tools:
                 pattern='com.st.stm32cube.ide.mcu.externaltools.make*'
             )
 
+        if self._cube_ide_drv and not self._objcopy:
+            self._objcopy = self._from_cube_ide(
+                STM32Tools.OBJCOPY,
+                pattern='com.st.stm32cube.ide.mcu.externaltools.gnu-tools*'
+            )
+
         if self._cube_ide_drv and not self._cube_prg:
             self._cube_prg = self._from_cube_ide(
                 STM32Tools.CUBE_PROGRAMMER,
@@ -132,6 +140,11 @@ class STM32Tools:
         """Return CUBE Programmer information"""
         self._second_chance()
         return self._cube_prg
+
+    def get_objcopy(self):
+        """Return CUBE Signing tool information"""
+        self._second_chance()
+        return self._objcopy
 
     def get_cube_signing_tool(self):
         """Return CUBE Signing tool information"""

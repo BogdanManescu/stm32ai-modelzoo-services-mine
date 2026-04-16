@@ -9,7 +9,8 @@ dataset:
    dataset_name: coco
    format: tfs
    class_names: [person]
-   test_path: ./datasets/od_coco_2017_person/test
+   test_images_path: /local/data/mini_od_person/tfs/test/images
+   test_annotations_path: /local/data/mini_od_person/tfs/test/annotations
    quantization_path: ./datasets/od_coco_2017_person/quantization
 
 preprocessing:

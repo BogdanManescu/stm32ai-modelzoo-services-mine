@@ -10,8 +10,6 @@
 import os
 from pathlib import Path
 import warnings
-import sklearn
-import mlflow
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
 from typing import Tuple, Optional, List
@@ -23,6 +21,7 @@ warnings.filterwarnings("ignore")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import onnxruntime
 import tensorflow as tf
+import mlflow
 import tqdm
 from sklearn.metrics import accuracy_score, confusion_matrix
 

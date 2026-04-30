@@ -31,3 +31,6 @@
 [submodule "application_code/semantic_segmentation/STM32N6"]
 	path = application_code/semantic_segmentation/STM32N6
 	url = https://github.com/STMicroelectronics/STM32N6-GettingStarted-SemanticSegmentation.git
+[submodule "application_code/audio/STM32U3"]
+	path = application_code/audio/STM32U3
+	url = https://github.com/STMicroelectronics/STM32U3-GettingStarted-AudioEventDetection.git

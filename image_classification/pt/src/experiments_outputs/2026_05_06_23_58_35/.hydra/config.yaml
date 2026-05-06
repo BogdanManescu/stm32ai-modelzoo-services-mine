@@ -1,0 +1,157 @@
+general:
+  project_name: ''
+  output: ''
+  saved_models_dir: saved_models
+  seed: 42
+  gpu_memory_limit: 3
+  display_figures: false
+operation_mode: chain_tqeb
+model:
+  framework: torch
+  model_name: mobilenetv2_w035_pt
+  pretrained: true
+  pretrained_dataset: imagenet
+  input_shape:
+  - 3
+  - 224
+  - 224
+dataset:
+  dataset_name: imagenet
+  class_names: ''
+  classes_file_path: ./datasets/deployment_labels_imagenet.txt
+  num_classes: 1000
+  data_dir: local/datasets/
+  workers: 4
+  worker_seeding: all
+  pin_mem: false
+  no_prefetcher: true
+  use_multi_epochs_loader: false
+preprocessing:
+  rescaling:
+    scale: None
+    offset: None
+  resizing:
+    interpolation: random
+    aspect_ratio: fit
+  color_mode: rgb
+  normalization:
+    mean:
+    - 0.485
+    - 0.456
+    - 0.406
+    std:
+    - 0.229
+    - 0.224
+    - 0.225
+data_augmentation:
+  no_aug: false
+  crop_range:
+  - 0.08
+  - 1.0
+  ratio:
+  - 0.75
+  - 1.33
+  horizontal_flip: 0.5
+  vertical_flip: 0.0
+  hflip: 0.5
+  vflip: 0.0
+  color_jitter: 0.4
+  aa: null
+  aug_repeats: 0
+  aug_splits: 0
+  jsd_loss: false
+  bce_loss: false
+  bce_target_thresh: null
+  reprob: 0
+  remode: pixel
+  recount: 1
+  resplit: false
+  mixup: 0.0
+  cutmix: 0.0
+  cutmix_minmax: null
+  mixup_prob: 1.0
+  mixup_switch_prob: 0.5
+  mixup_mode: batch
+  smoothing: 0.1
+  drop: 0.0
+  drop_connect: null
+  drop_path: null
+  drop_block: null
+training:
+  epochs: 1
+  batch_size: 256
+  validation_batch_size: null
+  optimizer:
+    opt: sgd
+    opt-eps: null
+    opt-betas: null
+    momentum: 0.9
+    weight_decay: 2.0e-05
+    clip_grad: null
+    clip_mode: norm
+    layer_decay: null
+  lr_scheduler:
+    sched: cosine
+    sched_on_updates: false
+    lr: null
+    lr_base: 0.1
+    lr_base_size: 256
+    lr_base_scale: ''
+    lr_noise: null
+    lr_noise_pct: 0.67
+    lr_noise_std: 1.0
+    lr_cycle_mul: 1.0
+    lr_cycle_decay: 0.5
+    lr_cycle_limit: 1
+    lr_k_decay: 1.0
+    warmup_lr: 1.0e-05
+    min_lr: 0
+    epoch_repeats: 0
+    start_epoch: 0
+    decay_milestones:
+    - 90
+    - 180
+    - 270
+    decay_epochs: 90
+    warmup_epochs: 5
+    warmup_prefix: false
+    cooldown_epochs: 0
+    patience_epochs: 10
+    decay_rate: 0.1
+  bn_momentum: null
+  bn_eps: null
+  sync_bn: false
+  dist_bn: reduce
+  split_bn: false
+  model_ema: false
+  model_ema_force_cpu: false
+  model_ema_decay: 0.9998
+  log_wandb: false
+  log_tb: false
+  log_interval: 50
+  recovery_interval: 0
+  checkpoint_hist: 10
+  save_images: false
+  amp: false
+  amp_dtype: float16
+  amp_impl: native
+  tta: 0
+  eval_metric: top1
+  no_ddp_bb: false
+  synchronize_step: false
+quantization:
+  quantizer: Onnx_quantizer
+  quantization_type: PTQ
+  quantization_input_type: uint8
+  quantization_output_type: float
+  export_dir: quantized_models
+tools:
+  stedgeai:
+    optimization: balanced
+    on_cloud: true
+    path_to_stedgeai: C:/ST/STEdgeAI/<x.y>/Utilities/windows/stedgeai.exe
+  path_to_cubeIDE: C:/ST/STM32CubeIDE_<*.*.*>/STM32CubeIDE/stm32cubeide.exe
+benchmarking:
+  board: STM32N6570-DK
+mlflow:
+  uri: ./pt/src/experiments_outputs/mlruns

@@ -1,9 +1,8 @@
 general:
   project_name: states_detection_pt
-  output: ''
   saved_models_dir: saved_models
   seed: 42
-  gpu_memory_limit: 3
+  gpu_memory_limit: 10
   display_figures: False
 
 operation_mode: training
@@ -15,13 +14,14 @@ dataset:
   validation_path: ./datasets/states_dataset/val
   test_path: ./datasets/states_dataset/test
   workers: 2
+  worker_seeding: 'all'
   pin_mem: true
   no_prefetcher: true
 
 preprocessing:
   rescaling:
-    scale: null
-    offset: null
+    scale: 1
+    offset: 0
   resizing:
     interpolation: bilinear
     aspect_ratio: fit
@@ -46,7 +46,7 @@ data_augmentation:
 
 model:
   framework: 'torch'
-  model_name: 'states_cnn'
+  model_name: 'states_cnn_pt'
   pretrained: False
   pretrained_dataset: null
   input_shape: [3, 16, 128]
@@ -69,11 +69,29 @@ training:
 
   lr_scheduler:
     sched: 'cosine'
+    sched_on_updates: False
+    lr: null
     lr_base: 0.001
-    warmup_epochs: 5
-    min_lr: 0.00001
+    lr_base_size: 32
+    lr_base_scale: ''
+    lr_noise: null
+    lr_noise_pct: 0.67
+    lr_noise_std: 1.0
+    lr_cycle_mul: 1.0
+    lr_cycle_decay: 0.5
+    lr_cycle_limit: 1
+    lr_k_decay: 1.0
     warmup_lr: 0.00001
+    min_lr: 0.00001
+    epoch_repeats: 0
+    start_epoch: 0
+    decay_milestones: [90, 180, 270]
+    decay_epochs: 90
+    warmup_epochs: 5
+    warmup_prefix: False
     cooldown_epochs: 0
+    patience_epochs: 10
+    decay_rate: 0.1
 
   log_interval: 10
   eval_metric: "top1"

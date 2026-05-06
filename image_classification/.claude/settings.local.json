@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(conda run *)"
+      "Bash(conda run *)",
+      "Bash(CLEARML_NO_DEFAULT_IMPORT=1 CONDA_NO_PLUGINS=true /c/Users/Bogdan/.conda/envs/stmai2/python stm32ai_main.py --config-path ./config_file_examples_pt/ --config-name training_states_config.yaml training.epochs=1 training.batch_size=32)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(/c/Users/Bogdan/.conda/envs/stmai2/python -c ' *)",
+      "Bash(grep -v \"^$\\\\|oneDNN\\\\|TF_CPP\\\\|UserWarning\")",
+      "Bash(/c/Users/Bogdan/.conda/envs/stmai2/python stm32ai_main.py --config-path ./config_file_examples_pt/ --config-name training_states_config.yaml training.epochs=1 training.batch_size=32)",
+      "Read(//tmp/**)",
+      "Read(//c/Users/Bogdan/**)",
+      "Bash(/c/Users/Bogdan/.conda/envs/stmai2/python stm32ai_main.py --config-path ./config_file_examples_pt/ --config-name training_states_config.yaml model.framework=torch training.epochs=1 training.batch_size=32)",
+      "Bash(/c/Users/Bogdan/.conda/envs/stmai2/python stm32ai_main.py --config-path ./config_file_examples_pt/ --config-name training_states_config.yaml model.framework=torch model.model_name=states_cnn training.epochs=1 training.batch_size=32)",
+      "Bash(/c/Users/Bogdan/.conda/envs/stmai2/python generate_states_dataset.py --train-count 1290 --val-count 258 --test-count 258 --output-dir ./datasets/states_dataset --seed 42)"
     ]
   }
 }

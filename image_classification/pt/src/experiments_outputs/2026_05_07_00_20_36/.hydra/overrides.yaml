@@ -1,0 +1,4 @@
+- model.framework=torch
+- model.model_name=states_cnn
+- training.epochs=1
+- training.batch_size=32

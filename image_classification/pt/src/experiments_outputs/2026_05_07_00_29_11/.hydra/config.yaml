@@ -1,0 +1,85 @@
+general:
+  project_name: states_detection_pt
+  saved_models_dir: saved_models
+  seed: 42
+  gpu_memory_limit: 10
+  display_figures: false
+operation_mode: training
+dataset:
+  dataset_name: custom
+  num_classes: 129
+  training_path: ./datasets/states_dataset/train
+  validation_path: ./datasets/states_dataset/val
+  test_path: ./datasets/states_dataset/test
+  workers: 2
+  pin_mem: true
+  no_prefetcher: true
+preprocessing:
+  rescaling:
+    scale: null
+    offset: null
+  resizing:
+    interpolation: bilinear
+    aspect_ratio: fit
+  color_mode: rgb
+  normalization:
+    mean:
+    - 0
+    - 0
+    - 0
+    std:
+    - 1
+    - 1
+    - 1
+data_augmentation:
+  no_aug: true
+  crop_range:
+  - 1.0
+  - 1.0
+  ratio:
+  - 1.0
+  - 1.0
+  horizontal_flip: 0
+  vertical_flip: 0
+  hflip: 0
+  vflip: 0
+  color_jitter: 0
+  reprob: 0
+  mixup: 0
+  cutmix: 0
+  smoothing: 0
+model:
+  framework: torch
+  model_name: states_cnn_pt
+  pretrained: false
+  pretrained_dataset: null
+  input_shape:
+  - 3
+  - 16
+  - 128
+training:
+  trainer_name: ic_trainer
+  epochs: 1
+  batch_size: 32
+  validation_batch_size: 32
+  optimizer:
+    opt: adam
+    opt_eps: null
+    opt_betas: null
+    momentum: 0.9
+    weight_decay: 0.0001
+    clip_grad: null
+    clip_mode: norm
+    layer_decay: null
+  lr_scheduler:
+    sched: cosine
+    lr_base: 0.001
+    warmup_epochs: 5
+    min_lr: 1.0e-05
+    warmup_lr: 1.0e-05
+    cooldown_epochs: 0
+  log_interval: 10
+  eval_metric: top1
+  amp: false
+mlflow:
+  uri: ./pt/src/experiments_outputs/mlruns

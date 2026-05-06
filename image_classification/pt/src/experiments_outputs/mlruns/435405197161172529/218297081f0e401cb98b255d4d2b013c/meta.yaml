@@ -1,0 +1,15 @@
+artifact_uri: file:///D:/STM/Projects/stm32ai-modelzoo-services-mine/image_classification/pt/src/experiments_outputs/mlruns/435405197161172529/218297081f0e401cb98b255d4d2b013c/artifacts
+end_time: 1778103298418
+entry_point_name: ''
+experiment_id: '435405197161172529'
+lifecycle_stage: active
+run_id: 218297081f0e401cb98b255d4d2b013c
+run_name: '2026_05_07_00_34_56'
+run_uuid: 218297081f0e401cb98b255d4d2b013c
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1778103297378
+status: 3
+tags: []
+user_id: Bogdan

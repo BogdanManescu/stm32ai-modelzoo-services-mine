@@ -1,0 +1,10 @@
+operation_mode: training
+[2026-05-07 00:34:57,659][train][INFO] - Training with a single process on 1 device (cuda).
+[2026-05-07 00:34:57,660][train][INFO] - Model states_cnn_pt created, param count:32081
+[2026-05-07 00:34:57,661][timm.data.config][INFO] - Data processing configuration for current model + dataset:
+[2026-05-07 00:34:57,661][timm.data.config][INFO] - 	input_size: (3, 16, 128)
+[2026-05-07 00:34:57,661][timm.data.config][INFO] - 	interpolation: bilinear
+[2026-05-07 00:34:57,661][timm.data.config][INFO] - 	mean: (0, 0, 0)
+[2026-05-07 00:34:57,661][timm.data.config][INFO] - 	std: (1, 1, 1)
+[2026-05-07 00:34:57,661][timm.data.config][INFO] - 	crop_pct: 0.875
+[2026-05-07 00:34:57,661][timm.data.config][INFO] - 	crop_mode: center

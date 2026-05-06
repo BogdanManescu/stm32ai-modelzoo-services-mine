@@ -399,7 +399,7 @@ def get_config(config_data: DictConfig) -> DefaultMunch:
     if cfg.model:
         legal=["framework", "model_path", "model_name", "input_shape", "pretrained", "model_type", "pretrained_dataset"]
         parse_model_section(cfg.model, cfg.operation_mode, mode_groups, legal=legal, required=[])
-        
+
     # General section parsing
     if not cfg.general:
         cfg.general = DefaultMunch.fromDict({"project_name": "<unnamed>"})

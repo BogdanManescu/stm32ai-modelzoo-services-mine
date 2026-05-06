@@ -1,0 +1,53 @@
+general:
+  project_name: states_detection
+  logs_dir: logs
+  saved_models_dir: saved_models
+  display_figures: true
+  global_seed: 127
+  gpu_memory_limit: 3
+operation_mode: training
+model:
+  model_name: st_mnistv1
+  model_type: null
+  input_shape: (16, 128, 3)
+  pretrained: false
+  framework: tf
+dataset:
+  dataset_name: custom_dataset
+  classes_file_path: ./datasets/states_dataset/labels.txt
+  training_path: ./datasets/states_dataset/train
+  validation_path: ./datasets/states_dataset/val
+  test_path: ./datasets/states_dataset/test
+  check_image_files: false
+preprocessing:
+  rescaling:
+    scale: 1/255
+    offset: 0
+  resizing:
+    aspect_ratio: fit
+    interpolation: nearest
+  color_mode: rgb
+data_augmentation:
+  random_brightness:
+    factor: 0.05
+training:
+  dropout: 0.2
+  batch_size: 16
+  epochs: 1
+  optimizer:
+    Adam:
+      learning_rate: 0.001
+  callbacks:
+    ReduceLROnPlateau:
+      monitor: val_accuracy
+      mode: max
+      factor: 0.5
+      patience: 5
+      min_lr: 1.0e-06
+    EarlyStopping:
+      monitor: val_accuracy
+      mode: max
+      restore_best_weights: true
+      patience: 15
+mlflow:
+  uri: ./tf/src/experiments_outputs/mlruns

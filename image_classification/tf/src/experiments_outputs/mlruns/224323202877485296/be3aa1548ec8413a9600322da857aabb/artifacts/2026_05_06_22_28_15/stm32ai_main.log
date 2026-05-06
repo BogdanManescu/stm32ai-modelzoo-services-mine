@@ -1,0 +1,12 @@
+operation_mode: training
+Dataset : custom_dataset
+Weights from model file : tf\src\experiments_outputs\2026_05_06_22_28_15\saved_models\st_mnistv1\st_mnistv1.keras
+The last epoch history :
+['epoch', 'accuracy', 'learning_rate', 'loss', 'val_accuracy', 'val_loss']
+['0', '0.01550387591123581', '0.0010000000474974513', '4.8943328857421875', '0.007751937955617905', '4.86301326751709']
+Training runtime : 6 s
+Average time per epoch : 6.0 s
+Nb params of float model : 16705
+Float model test_set:
+Accuracy of float model : 0.78 %
+Loss of float model : 4.86 

@@ -20,6 +20,7 @@ from image_classification.pt.src.models.fasternet.fasternet import (fasternet_l,
                                                           fasternet_t1,
                                                           fasternet_t2)
 from image_classification.pt.src.models.stresnet import STResNetMicro, STResNetMilli, STResNetNano ,STResNetPico, STResNetTiny
+from image_classification.pt.src.models.states_cnn import StatesCNN
 from image_classification.pt.wrappers.models.utils import load_checkpoint_ic
 from image_classification.pt.wrappers.models.checkpoints import MODEL_CHECKPOINTS
 
@@ -42,6 +43,7 @@ MODEL_FNS = {
     'st_resnetnano_actrelu_pt': (STResNetNano, {}),
     'st_resnetpico_actrelu_pt': (STResNetPico, {}),
     'st_resnettiny_actrelu_pt': (STResNetTiny, {}),
+    'states_cnn': (StatesCNN, {'dropout': 0.2}),
 }
 
 def register_model_wrapper(model_fn, model_name, **model_init_kwargs):
